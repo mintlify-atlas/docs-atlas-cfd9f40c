@@ -1,0 +1,94 @@
+{
+  "projectType": "saas",
+  "projectName": "Crafter LoL",
+  "projectDescription": "An interactive League of Legends item crafting game that challenges players to match items with their correct components",
+  "theme": "almond",
+  "primaryColor": "#fbc926",
+  "lightColor": "#8c73fa",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Game Guide",
+            "pages": [
+              "game-guide/how-to-play",
+              "game-guide/game-mechanics",
+              "game-guide/difficulty-levels",
+              "game-guide/scoring-system"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "development/setup",
+              "development/environment-configuration"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/frontend-architecture",
+              "development/backend-architecture",
+              "development/data-dragon-integration"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "development/docker-deployment",
+              "development/production-deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/game/get-question",
+              "api-reference/game/validate-answer",
+              "api-reference/items/get-all-items"
+            ]
+          },
+          {
+            "group": "Data Models",
+            "pages": [
+              "api-reference/models/game-question",
+              "api-reference/models/validation-response",
+              "api-reference/models/item"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Interactive item crafting gameplay with League of Legends items",
+    "Three difficulty levels with adaptive time limits",
+    "Real-time score tracking and best score persistence",
+    "Data Dragon API integration for latest game data",
+    "Responsive design for desktop and mobile play"
+  ],
+  "publicApiSurface": [
+    "GET /api/game/question - Generate random crafting question",
+    "POST /api/game/validate - Validate player's answer",
+    "GET /api/items - Fetch all League of Legends items",
+    "GameService.generateQuestion() - Core game logic",
+    "ItemService.isValidCraftingCombination() - Validation logic",
+    "DataDragonService.fetchCraftableItems() - Item data fetching"
+  ]
+}
