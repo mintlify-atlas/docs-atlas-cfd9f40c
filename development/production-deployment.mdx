@@ -82,9 +82,9 @@ services:
     image: crafter-lol-backend:latest
     container_name: crafter-backend-prod
     ports:
-      - "8080:8080"
+      - "5000:5000"
     environment:
-      - PORT=8080
+      - PORT=5000
       - CORS_ORIGINS=${FRONTEND_URL}
       - ddragon.version=16.3.1
       - ddragon.language=es_MX
@@ -98,7 +98,7 @@ services:
           memory: 256M
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/game/question"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/game/question"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -187,10 +187,10 @@ spec:
       - name: backend
         image: crafter-lol-backend:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 5000
         env:
         - name: PORT
-          value: "8080"
+          value: "5000"
         - name: CORS_ORIGINS
           valueFrom:
             configMapKeyRef:
@@ -208,13 +208,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/game/question
-            port: 8080
+            port: 5000
           initialDelaySeconds: 40
           periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /api/game/question
-            port: 8080
+            port: 5000
           initialDelaySeconds: 30
           periodSeconds: 10
 ---
@@ -228,7 +228,7 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8080
+      targetPort: 5000
   type: LoadBalancer
 ```
 
@@ -333,7 +333,7 @@ kubectl logs -f deployment/crafter-backend
     ```bash
     eb create crafter-prod-env \
       --instance-type t3.medium \
-      --envvars PORT=8080,CORS_ORIGINS=https://yourdomain.com
+      --envvars PORT=5000,CORS_ORIGINS=https://yourdomain.com
     ```
   </Step>
 
@@ -435,7 +435,7 @@ Create `application-prod.properties`:
 
 ```properties
 # Server
-server.port=${PORT:8080}
+server.port=${PORT:5000}
 
 # Data Dragon
 ddragon.base.url=https://ddragon.leagueoflegends.com
@@ -506,7 +506,7 @@ server {
 
     # Backend proxy
     location /api/ {
-        proxy_pass http://backend:8080/api/;
+        proxy_pass http://backend:5000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -690,7 +690,7 @@ kubectl rollout undo deployment/crafter-backend --to-revision=2
     ```bash
     docker ps  # Check if backend is running
     docker logs crafter-backend  # Check for errors
-    curl http://localhost:8080/api/game/question  # Test directly
+    curl http://localhost:5000/api/game/question  # Test directly
     ```
   </Accordion>
 

@@ -52,7 +52,7 @@ Before you begin, make sure you have the following installed:
     ```
     
     The backend will:
-    - Start on `http://localhost:8080`
+    - Start on `http://localhost:5000`
     - Fetch League of Legends item data from the Data Dragon API
     - Cache item data for fast responses
     - Expose REST endpoints at `/api/game/*`
@@ -61,10 +61,10 @@ Before you begin, make sure you have the following installed:
       You should see output similar to this:
       
       ```
-      INFO  Fetching items from Data Dragon API - Version: 14.1.1, Language: en_US
+      INFO  Fetching items from Data Dragon API - Version: 16.3.1, Language: es_MX
       INFO  Successfully fetched and cached 200 items
       INFO  Found 150 craftable items out of 200 total items
-      INFO  Tomcat started on port(s): 8080 (http)
+      INFO  Tomcat started on port(s): 5000 (http)
       INFO  Started CrafterApplication in 3.456 seconds
       ```
     </Accordion>
@@ -116,12 +116,12 @@ The backend uses default settings that work out of the box. If you need to custo
 <CodeGroup>
 ```properties application.properties
 # Data Dragon API Configuration
-ddragon.version=14.1.1
-ddragon.language=en_US
+ddragon.version=16.3.1
+ddragon.language=es_MX
 ddragon.base.url=https://ddragon.leagueoflegends.com
 
 # Server Port
-server.port=8080
+server.port=5000
 
 # Cache Configuration
 spring.cache.type=caffeine
@@ -135,7 +135,7 @@ The frontend connects to the backend API. If you changed the backend port, updat
 
 <CodeGroup>
 ```bash .env
-VITE_API_URL=http://localhost:8080/api
+VITE_API_URL=http://localhost:5000/api
 ```
 </CodeGroup>
 
@@ -149,7 +149,7 @@ After completing the setup, verify everything is working:
   Test the backend API by fetching a random question:
   
   ```bash
-  curl http://localhost:8080/api/game/question?difficulty=MEDIUM
+  curl http://localhost:5000/api/game/question?difficulty=MEDIUM
   ```
   
   You should receive a JSON response with a target item and component options.
@@ -159,7 +159,7 @@ After completing the setup, verify everything is working:
   Open the browser console (F12) and check for any errors. You should see successful API calls to the backend:
   
   ```
-  GET http://localhost:8080/api/game/question?difficulty=MEDIUM 200 OK
+  GET http://localhost:5000/api/game/question?difficulty=MEDIUM 200 OK
   ```
 </Accordion>
 
@@ -167,7 +167,7 @@ After completing the setup, verify everything is working:
 
 <AccordionGroup>
   <Accordion title="Backend port already in use">
-    If port 8080 is already in use, you can change it:
+    If port 5000 is already in use, you can change it:
     
     1. Edit `application.properties` and set `server.port=8081`
     2. Update the frontend `.env` file: `VITE_API_URL=http://localhost:8081/api`
@@ -193,7 +193,7 @@ After completing the setup, verify everything is working:
   <Accordion title="Frontend not connecting to backend">
     If the frontend can't reach the backend:
     
-    1. Verify the backend is running: `curl http://localhost:8080/api/game/question`
+    1. Verify the backend is running: `curl http://localhost:5000/api/game/question`
     2. Check the frontend console for CORS or network errors
     3. Ensure the `VITE_API_URL` in your `.env` matches the backend URL
     4. Restart the frontend dev server after changing `.env` files

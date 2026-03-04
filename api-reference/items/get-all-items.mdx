@@ -1,53 +1,127 @@
 ---
-title: 'Items Service'
-description: 'Internal service methods for managing League of Legends items'
+title: 'Item Endpoints'
+description: 'REST API endpoints for retrieving League of Legends item data'
+api: 'GET /api/items'
 ---
 
 ## Overview
 
-The Item service manages the League of Legends item data used throughout the Crafter LoL application. Items are loaded from the Riot Games Data Dragon API and cached for game question generation.
+The Item endpoints provide access to League of Legends item data used in Crafter LoL. Items are loaded from the Riot Games Data Dragon API and cached for optimal performance.
 
 ## Item Model
 
 Items in the system follow the Item model structure. See the [Item Model](/api-reference/models/item) documentation for complete field details.
 
-## Key Service Methods
+## Endpoints
 
-While there are no direct REST endpoints for item retrieval (items are used internally by the game endpoints), the following service methods are available:
+### GET /api/items
 
-### getCraftableItems()
+Retrieves all League of Legends items in the database.
 
-Retrieves all items that can be crafted (items that have component requirements).
+**Response:** `Map<String, Item>` - Map of item IDs to Item objects
 
-**Returns:** `List<Item>` - All craftable items
+**Example Request:**
 
-**Usage:** Used internally to generate game questions for craftable items.
+```bash
+curl http://localhost:5000/api/items
+```
 
-### getItemById(String itemId)
+**Example Response:**
+
+```json
+{
+  "3078": {
+    "id": "3078",
+    "name": "Fuerza de trinidad",
+    "description": "...",
+    "totalCost": 3333,
+    "from": ["3044", "3051", "3057"],
+    "imageUrl": "https://ddragon.leagueoflegends.com/cdn/16.3.1/img/item/3078.png"
+  },
+  "1001": {
+    "id": "1001",
+    "name": "Botas de velocidad",
+    "description": "...",
+    "totalCost": 300,
+    "imageUrl": "https://ddragon.leagueoflegends.com/cdn/16.3.1/img/item/1001.png"
+  }
+}
+```
+
+### GET /api/items/craftable
+
+Retrieves only craftable items (items that have component requirements).
+
+**Response:** `Map<String, Item>` - Map of craftable item IDs to Item objects
+
+**Example Request:**
+
+```bash
+curl http://localhost:5000/api/items/craftable
+```
+
+<Note>
+  Craftable items are those with a populated `from` field, indicating they can be built from component items.
+</Note>
+
+### GET /api/items/{itemId}
 
 Retrieves a specific item by its unique identifier.
 
-**Parameters:**
-- `itemId` (String) - The unique identifier of the item
+**Path Parameters:**
 
-**Returns:** `Item` - The item object or null if not found
+<ParamField path="itemId" type="string" required>
+  The unique identifier of the item (e.g., "3078", "1001")
+</ParamField>
 
-### getItemsByDifficulty(String difficulty)
+**Response:** `Item` - The item object or 404 if not found
 
-Filters craftable items by difficulty level based on component count:
-- **EASY**: Items with 2 components
-- **MEDIUM**: Items with 3 components  
-- **HARD**: Items with 4 or more components
+**Example Request:**
 
-**Parameters:**
-- `difficulty` (String) - One of: EASY, MEDIUM, HARD
+```bash
+curl http://localhost:5000/api/items/3078
+```
 
-**Returns:** `List<Item>` - Filtered list of items matching the difficulty
+**Example Response:**
+
+```json
+{
+  "id": "3078",
+  "name": "Fuerza de trinidad",
+  "description": "Un objeto legendario...",
+  "totalCost": 3333,
+  "from": ["3044", "3051", "3057"],
+  "into": [],
+  "tags": ["Damage", "AttackSpeed", "CooldownReduction"],
+  "imageUrl": "https://ddragon.leagueoflegends.com/cdn/16.3.1/img/item/3078.png",
+  "image": {
+    "full": "3078.png",
+    "sprite": "item2.png",
+    "group": "item"
+  }
+}
+```
+
+## Internal Service Methods
+
+The following service methods are available for internal use:
+
+**ItemService.getCraftableItems()**
+
+Retrieves all items that can be crafted (items that have component requirements). Used internally by the `/craftable` endpoint.
+
+**ItemService.getItemById(String itemId)**
+
+Retrieves a specific item by its unique identifier. Used internally by the `/{itemId}` endpoint.
+
+**ItemService.isValidCraftingCombination(String targetItemId, List&lt;String&gt; componentIds)**
+
+Validates whether the selected components correctly craft the target item. Used by the game validation endpoint.
 
 ## Item Data Source
 
 Items are sourced from the Riot Games Data Dragon API:
-- Base URL: `https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/item.json`
+- Base URL: `https://ddragon.leagueoflegends.com/cdn/{version}/data/es_MX/item.json`
 - Images: `https://ddragon.leagueoflegends.com/cdn/{version}/img/item/{itemId}.png`
 
 ## Usage in Game Endpoints
