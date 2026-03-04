@@ -1,0 +1,130 @@
+---
+title: 'GameQuestion'
+description: 'Data model representing a crafting question in the game'
+---
+
+## Overview
+
+The `GameQuestion` DTO represents a complete crafting question presented to the player. It includes the target item to craft, the correct components, distractor options, and game metadata.
+
+## Fields
+
+<ResponseField name="targetItemId" type="String" required>
+  The unique identifier of the item that the player needs to craft
+</ResponseField>
+
+<ResponseField name="targetItemName" type="String" required>
+  The display name of the target item (e.g., "Trinity Force", "Infinity Edge")
+</ResponseField>
+
+<ResponseField name="targetItemImageUrl" type="String" required>
+  Full URL to the target item's image from the Data Dragon CDN
+</ResponseField>
+
+<ResponseField name="correctComponentIds" type="List<String>" required>
+  List of item IDs that are the correct components needed to craft the target item. This is used for validation.
+</ResponseField>
+
+<ResponseField name="correctComponents" type="List<ItemOption>" required>
+  List of ItemOption objects containing full details of the correct components. Each ItemOption contains: `itemId` (String), `name` (String), `imageUrl` (String), and `cost` (Integer).
+</ResponseField>
+
+<ResponseField name="options" type="List<ItemOption>" required>
+  List of all available item options presented to the player. This includes both the correct components and distractor items. The player must select the correct components from this list.
+</ResponseField>
+
+<ResponseField name="timeLimit" type="Integer" required>
+  Time limit for answering the question in seconds. Varies based on difficulty level.
+</ResponseField>
+
+<ResponseField name="difficulty" type="String" required>
+  The difficulty level of this question. Valid values:
+  - `EASY` - Items with 2 components
+  - `MEDIUM` - Items with 3 components
+  - `HARD` - Items with 4+ components
+</ResponseField>
+
+## Example JSON
+
+```json
+{
+  "targetItemId": "6676",
+  "targetItemName": "Kraken Slayer",
+  "targetItemImageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/6676.png",
+  "correctComponentIds": ["1037", "3086", "1042"],
+  "correctComponents": [
+    {
+      "itemId": "1037",
+      "name": "Pickaxe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1037.png",
+      "cost": 875
+    },
+    {
+      "itemId": "3086",
+      "name": "Zeal",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3086.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "1042",
+      "name": "Dagger",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1042.png",
+      "cost": 300
+    }
+  ],
+  "options": [
+    {
+      "itemId": "1037",
+      "name": "Pickaxe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1037.png",
+      "cost": 875
+    },
+    {
+      "itemId": "3086",
+      "name": "Zeal",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3086.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "1042",
+      "name": "Dagger",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1042.png",
+      "cost": 300
+    },
+    {
+      "itemId": "1036",
+      "name": "Long Sword",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1036.png",
+      "cost": 350
+    },
+    {
+      "itemId": "1028",
+      "name": "Ruby Crystal",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1028.png",
+      "cost": 400
+    },
+    {
+      "itemId": "1052",
+      "name": "Amplifying Tome",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1052.png",
+      "cost": 435
+    }
+  ],
+  "timeLimit": 30,
+  "difficulty": "MEDIUM"
+}
+```
+
+## Usage
+
+This model is returned by the [GET /api/game/question](/api-reference/game/get-question) endpoint and is used to:
+1. Display the target item to the player
+2. Present the available component options
+3. Set the time limit for the question
+4. Store the correct answer for validation
+
+## Notes
+
+- The `options` array always includes all `correctComponents` plus additional distractor items
+- The number of options varies but typically includes 3-6 distractor items in addition to the correct components
+- `correctComponentIds` is a convenience field for quick validation without parsing the full `correctComponents` objects

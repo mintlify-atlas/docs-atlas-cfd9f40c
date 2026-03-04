@@ -1,0 +1,122 @@
+---
+title: 'ValidationResponse'
+description: 'Response model for answer validation results'
+---
+
+## Overview
+
+The `ValidationResponse` DTO contains the results of validating a player's answer to a crafting question. It provides detailed feedback including correctness, the right answer, and scoring information.
+
+## Fields
+
+<ResponseField name="correct" type="boolean" required>
+  Indicates whether the player's answer was correct. `true` if the selected components exactly match the required components, `false` otherwise.
+</ResponseField>
+
+<ResponseField name="correctComponentIds" type="List<String>" required>
+  List of item IDs representing the correct components needed to craft the target item. This is always provided regardless of whether the answer was correct.
+</ResponseField>
+
+<ResponseField name="correctComponentNames" type="List<String>" required>
+  List of display names for the correct components (e.g., ["Phage", "Hearthbound Axe", "Sheen"]). Useful for displaying feedback to the player.
+</ResponseField>
+
+<ResponseField name="correctComponents" type="List<ItemOption>" required>
+  List of ItemOption objects with complete details about each correct component. Each ItemOption contains: `itemId` (String), `name` (String), `imageUrl` (String), and `cost` (Integer).
+</ResponseField>
+
+<ResponseField name="incorrectComponentIds" type="List<String>" required>
+  List of item IDs that the player selected incorrectly. This will be an empty list if the answer was correct. Helps players understand which selections were wrong.
+</ResponseField>
+
+<ResponseField name="message" type="String" required>
+  Human-readable feedback message describing the result. Examples:
+  - "Correct! You've successfully crafted Trinity Force."
+  - "Incorrect. The correct components are: Phage, Hearthbound Axe, Sheen."
+</ResponseField>
+
+<ResponseField name="scorePoints" type="Integer" required>
+  Points awarded for this answer. Typically a positive value (e.g., 100) for correct answers and 0 for incorrect answers. May vary based on difficulty or time taken.
+</ResponseField>
+
+## Example JSON (Correct Answer)
+
+```json
+{
+  "correct": true,
+  "correctComponentIds": ["3044", "3051", "3057"],
+  "correctComponentNames": ["Phage", "Hearthbound Axe", "Sheen"],
+  "correctComponents": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    }
+  ],
+  "incorrectComponentIds": [],
+  "message": "Correct! You've successfully crafted Trinity Force.",
+  "scorePoints": 100
+}
+```
+
+## Example JSON (Incorrect Answer)
+
+```json
+{
+  "correct": false,
+  "correctComponentIds": ["3044", "3051", "3057"],
+  "correctComponentNames": ["Phage", "Hearthbound Axe", "Sheen"],
+  "correctComponents": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    }
+  ],
+  "incorrectComponentIds": ["1001", "1036"],
+  "message": "Incorrect. The correct components are: Phage, Hearthbound Axe, Sheen.",
+  "scorePoints": 0
+}
+```
+
+## Usage
+
+This model is returned by the [POST /api/game/validate](/api-reference/game/validate-answer) endpoint after the player submits their answer. The frontend should use this response to:
+
+1. Display whether the answer was correct or incorrect
+2. Show the correct components if the player was wrong
+3. Highlight which components the player selected incorrectly
+4. Update the player's score with the awarded points
+5. Display the feedback message
+
+## Validation Logic
+
+- An answer is considered correct only if `selectedComponentIds` exactly matches `correctComponentIds` (same items, order doesn't matter)
+- Partial credit is not awarded - the player must select all correct components and no incorrect ones
+- The `incorrectComponentIds` field helps identify which selections were wrong by comparing the selected components with the correct ones

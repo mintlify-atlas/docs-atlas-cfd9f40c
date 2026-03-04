@@ -1,0 +1,492 @@
+---
+title: 'Backend Architecture'
+description: 'Spring Boot backend architecture and design patterns'
+---
+
+## Tech Stack
+
+<CardGroup cols={2}>
+  <Card title="Spring Boot 4.0.3" icon="leaf">
+    Modern Spring Boot framework with Java 17
+  </Card>
+  <Card title="Spring WebFlux" icon="bolt">
+    Reactive WebClient for non-blocking HTTP calls
+  </Card>
+  <Card title="Caffeine Cache" icon="database">
+    High-performance in-memory caching
+  </Card>
+  <Card title="Maven" icon="box">
+    Build and dependency management
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+```
+source/Back/crafter/
+├── src/main/java/com/crafter/league/of/legends/crafter/
+│   ├── config/
+│   │   ├── CacheConfig.java       # Caffeine cache configuration
+│   │   ├── CorsConfig.java        # CORS settings
+│   │   └── WebClientConfig.java   # WebClient setup
+│   ├── controller/
+│   │   ├── GameController.java    # Game API endpoints
+│   │   └── ItemController.java    # Item endpoints
+│   ├── service/
+│   │   ├── DataDragonService.java # Data Dragon integration
+│   │   └── GameService.java       # Game logic
+│   ├── model/
+│   │   ├── Item.java              # Item entity
+│   │   └── ItemsData.java         # API response wrapper
+│   └── dto/
+│       ├── GameQuestion.java      # Game question DTO
+│       ├── ValidationRequest.java # Validation request DTO
+│       └── ValidationResponse.java # Validation response DTO
+├── src/main/resources/
+│   └── application.properties     # Configuration
+├── pom.xml                        # Maven dependencies
+└── Dockerfile                     # Container definition
+```
+
+## Key Dependencies
+
+From `pom.xml`:
+
+```xml
+<properties>
+  <java.version>17</java.version>
+</properties>
+
+<dependencies>
+  <!-- Spring Boot Web for REST APIs -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+  </dependency>
+
+  <!-- Spring WebFlux for reactive WebClient -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+  </dependency>
+
+  <!-- Spring Cache abstraction -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-cache</artifactId>
+  </dependency>
+
+  <!-- Caffeine for high-performance caching -->
+  <dependency>
+    <groupId>com.github.ben-manes.caffeine</groupId>
+    <artifactId>caffeine</artifactId>
+  </dependency>
+
+  <!-- Lombok for reducing boilerplate -->
+  <dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+  </dependency>
+
+  <!-- Validation API -->
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+  </dependency>
+</dependencies>
+```
+
+## Configuration Layer
+
+### Cache Configuration
+
+Caffeine cache setup in `config/CacheConfig.java`:
+
+```java
+@Configuration
+@EnableCaching
+public class CacheConfig {
+
+    public static final String ITEMS_CACHE = "items";
+    public static final String CRAFTABLE_ITEMS_CACHE = "craftableItems";
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+                ITEMS_CACHE,
+                CRAFTABLE_ITEMS_CACHE
+        );
+
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+                .maximumSize(500)
+                .expireAfterWrite(24, TimeUnit.HOURS)
+                .recordStats());
+
+        return cacheManager;
+    }
+}
+```
+
+<Info>
+  **Cache Strategy**: Items are cached for 24 hours with a maximum of 500 entries. This reduces Data Dragon API calls and improves response times.
+</Info>
+
+### WebClient Configuration
+
+Reactive HTTP client setup in `config/WebClientConfig.java`:
+
+```java
+@Configuration
+public class WebClientConfig {
+
+    @Value("${ddragon.base.url}")
+    private String baseUrl;
+
+    @Value("${webclient.timeout.connect:5000}")
+    private int connectTimeout;
+
+    @Value("${webclient.timeout.read:10000}")
+    private int readTimeout;
+
+    @Value("${webclient.buffer.size:5242880}")
+    private int bufferSize;  // 5 MB default
+
+    @Bean
+    public WebClient webClient() {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
+                .responseTimeout(Duration.ofMillis(readTimeout))
+                .doOnConnected(conn ->
+                        conn.addHandlerLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS))
+                                .addHandlerLast(new WriteTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS)));
+
+        // Configure buffer for large Data Dragon responses
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(bufferSize))
+                .build();
+
+        return WebClient.builder()
+                .baseUrl(baseUrl)
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .exchangeStrategies(strategies)
+                .build();
+    }
+}
+```
+
+<Note>
+  **Buffer Size**: Set to 5MB to handle large JSON responses from Data Dragon API (typically 500KB+).
+</Note>
+
+### CORS Configuration
+
+Cross-origin setup in `config/CorsConfig.java`:
+
+```java
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+
+    @Value("${cors.allowed.origins}")
+    private String[] allowedOrigins;
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOriginPatterns(allowedOrigins)
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+    }
+}
+```
+
+## Service Layer
+
+### DataDragonService
+
+Core service for fetching and caching item data from `service/DataDragonService.java`:
+
+```java
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class DataDragonService {
+
+    private final WebClient webClient;
+
+    @Value("${ddragon.version}")
+    private String version;
+
+    @Value("${ddragon.language}")
+    private String language;
+
+    @Value("${ddragon.base.url}")
+    private String baseUrl;
+
+    @Cacheable(value = CacheConfig.ITEMS_CACHE, key = "'all'")
+    public Map<String, Item> fetchAllItems(){
+        log.info("Fetching items from Data Dragon API - Version: {}, Language: {}", 
+                 version, language);
+
+        String url = String.format("/cdn/%s/data/%s/item.json", version, language);
+
+        ItemsData itemsData = webClient.get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(ItemsData.class)
+                .block();
+
+        if (itemsData == null || itemsData.getData() == null) {
+            log.error("Failed to fetch items from Data Dragon");
+            throw new RuntimeException("Failed to fetch items from Data Dragon API");
+        }
+
+        // Enrich items with full image URLs
+        Map<String, Item> enrichedItems = itemsData.getData().entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            Item item = entry.getValue();
+                            item.setId(entry.getKey());
+
+                            // Build full image URL
+                            if (item.getImage() != null && item.getImage().containsKey("full")) {
+                                String imageName = (String) item.getImage().get("full");
+                                String fullImageUrl = String.format("%s/cdn/%s/img/item/%s",
+                                        baseUrl, version, imageName);
+                                item.setImageUrl(fullImageUrl);
+                            }
+
+                            return item;
+                        }
+                ));
+
+        log.info("Successfully fetched and cached {} items", enrichedItems.size());
+        return enrichedItems;
+    }
+
+    @Cacheable(value = CacheConfig.CRAFTABLE_ITEMS_CACHE, key = "'craftable'")
+    public Map<String, Item> fetchCraftableItems() {
+        log.info("Filtering craftable items");
+
+        Map<String, Item> allItems = fetchAllItems();
+
+        Map<String, Item> craftableItems = allItems.entrySet().stream()
+                .filter(entry -> {
+                    Item item = entry.getValue();
+                    // Item is craftable if it has components and is not basic
+                    return item.getFrom() != null &&
+                            !item.getFrom().isEmpty() &&
+                            item.getTotalCost() > 0;
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        log.info("Found {} craftable items out of {} total items",
+                craftableItems.size(), allItems.size());
+
+        return craftableItems;
+    }
+}
+```
+
+<AccordionGroup>
+  <Accordion title="@Cacheable Annotation">
+    Spring's `@Cacheable` automatically caches method results:
+    
+    - **First call**: Fetches from Data Dragon API and stores in cache
+    - **Subsequent calls**: Returns cached data (no API call)
+    - **Cache key**: Static key `'all'` or `'craftable'`
+    - **Expiration**: 24 hours (configured in CacheConfig)
+  </Accordion>
+
+  <Accordion title="Image URL Enrichment">
+    The service enriches items with full CDN URLs:
+    ```
+    Original: {"full": "1001.png"}
+    Enriched: "https://ddragon.leagueoflegends.com/cdn/16.3.1/img/item/1001.png"
+    ```
+  </Accordion>
+
+  <Accordion title="Craftable Item Filtering">
+    Items are craftable if:
+    - They have `from` array (component IDs)
+    - Array is not empty
+    - Total cost is greater than 0
+  </Accordion>
+</AccordionGroup>
+
+## Controller Layer
+
+### GameController
+
+REST API endpoints in `controller/GameController.java`:
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/api/game")
+@RequiredArgsConstructor
+public class GameController {
+
+    private final GameService gameService;
+
+    @GetMapping("/question")
+    public ResponseEntity<GameQuestion> getQuestion(
+            @RequestParam(required = false, defaultValue = "MEDIUM") String difficulty) {
+        log.info("GET /api/game/question?difficulty={}", difficulty);
+
+        try {
+            GameQuestion question = gameService.generateQuestion(difficulty);
+            return ResponseEntity.ok(question);
+        } catch (Exception e) {
+            log.error("Error generating question", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<ValidationResponse> validateAnswer(
+            @Valid @RequestBody ValidationRequest request) {
+        log.info("POST /api/game/validate - Target: {}, Selected: {}",
+                request.getTargetItemId(), request.getSelectedComponentIds());
+
+        try {
+            ValidationResponse response = gameService.validateAnswer(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error validating answer", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+}
+```
+
+### API Endpoints
+
+<ParamField path="GET /api/game/question" type="endpoint">
+  Returns a random craftable item with options.
+  
+  **Query Parameters:**
+  - `difficulty` (optional): Game difficulty (default: MEDIUM)
+  
+  **Response:**
+  ```json
+  {
+    "targetItem": { ... },
+    "options": [ ... ],
+    "correctComponents": ["1001", "1036"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="POST /api/game/validate" type="endpoint">
+  Validates player's answer.
+  
+  **Request Body:**
+  ```json
+  {
+    "targetItemId": "3031",
+    "selectedComponentIds": ["1001", "1036"]
+  }
+  ```
+  
+  **Response:**
+  ```json
+  {
+    "isCorrect": true,
+    "correctComponents": ["1001", "1036"]
+  }
+  ```
+</ParamField>
+
+## Logging
+
+The application uses **SLF4J** with Lombok's `@Slf4j` annotation:
+
+```java
+@Slf4j
+@Service
+public class DataDragonService {
+    public Map<String, Item> fetchAllItems() {
+        log.info("Fetching items from Data Dragon API - Version: {}, Language: {}", 
+                 version, language);
+        // ...
+        log.info("Successfully fetched and cached {} items", enrichedItems.size());
+    }
+}
+```
+
+Log output:
+```
+2026-03-04 10:30:15 - Fetching items from Data Dragon API - Version: 16.3.1, Language: es_MX
+2026-03-04 10:30:16 - Successfully fetched and cached 200 items
+```
+
+## Design Patterns
+
+<CardGroup cols={2}>
+  <Card title="Dependency Injection" icon="plug">
+    Spring manages all beans and dependencies via constructor injection with Lombok's `@RequiredArgsConstructor`
+  </Card>
+  <Card title="Repository Pattern" icon="database">
+    DataDragonService acts as a repository for external API data
+  </Card>
+  <Card title="DTO Pattern" icon="exchange">
+    Separate DTOs for API requests/responses decouple external contracts from internal models
+  </Card>
+  <Card title="Configuration Externalization" icon="gear">
+    All configuration in `application.properties` for easy environment-specific changes
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="API Errors">
+    Controllers catch exceptions and return appropriate HTTP status codes:
+    ```java
+    try {
+        GameQuestion question = gameService.generateQuestion(difficulty);
+        return ResponseEntity.ok(question);
+    } catch (Exception e) {
+        log.error("Error generating question", e);
+        return ResponseEntity.internalServerError().build();
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Data Dragon Failures">
+    Service throws RuntimeException if API call fails:
+    ```java
+    if (itemsData == null || itemsData.getData() == null) {
+        log.error("Failed to fetch items from Data Dragon");
+        throw new RuntimeException("Failed to fetch items from Data Dragon API");
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Validation">
+    Jakarta Validation annotations on DTOs:
+    ```java
+    public class ValidationRequest {
+        @NotBlank
+        private String targetItemId;
+        
+        @NotEmpty
+        private List<String> selectedComponentIds;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Dragon Integration" icon="dragon" href="/development/data-dragon-integration">
+    Deep dive into API integration details
+  </Card>
+  <Card title="Docker Deployment" icon="docker" href="/development/docker-deployment">
+    Learn how to containerize the backend
+  </Card>
+</CardGroup>

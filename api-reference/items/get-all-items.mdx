@@ -1,0 +1,64 @@
+---
+title: 'Items Service'
+description: 'Internal service methods for managing League of Legends items'
+---
+
+## Overview
+
+The Item service manages the League of Legends item data used throughout the Crafter LoL application. Items are loaded from the Riot Games Data Dragon API and cached for game question generation.
+
+## Item Model
+
+Items in the system follow the Item model structure. See the [Item Model](/api-reference/models/item) documentation for complete field details.
+
+## Key Service Methods
+
+While there are no direct REST endpoints for item retrieval (items are used internally by the game endpoints), the following service methods are available:
+
+### getCraftableItems()
+
+Retrieves all items that can be crafted (items that have component requirements).
+
+**Returns:** `List<Item>` - All craftable items
+
+**Usage:** Used internally to generate game questions for craftable items.
+
+### getItemById(String itemId)
+
+Retrieves a specific item by its unique identifier.
+
+**Parameters:**
+- `itemId` (String) - The unique identifier of the item
+
+**Returns:** `Item` - The item object or null if not found
+
+### getItemsByDifficulty(String difficulty)
+
+Filters craftable items by difficulty level based on component count:
+- **EASY**: Items with 2 components
+- **MEDIUM**: Items with 3 components  
+- **HARD**: Items with 4 or more components
+
+**Parameters:**
+- `difficulty` (String) - One of: EASY, MEDIUM, HARD
+
+**Returns:** `List<Item>` - Filtered list of items matching the difficulty
+
+## Item Data Source
+
+Items are sourced from the Riot Games Data Dragon API:
+- Base URL: `https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/item.json`
+- Images: `https://ddragon.leagueoflegends.com/cdn/{version}/img/item/{itemId}.png`
+
+## Usage in Game Endpoints
+
+Items are utilized by the game endpoints:
+- [GET /api/game/question](/api-reference/game/get-question) - Uses items to generate crafting questions
+- [POST /api/game/validate](/api-reference/game/validate-answer) - Validates answers against item component data
+
+## Notes
+
+- Items are filtered to include only craftable items (those with the `from` field populated)
+- Item images are automatically resolved from the Data Dragon CDN
+- Total cost is calculated from the `gold.total` field
+- Items include stats, tags, and upgrade paths (`into` field) for potential future features

@@ -1,0 +1,139 @@
+---
+title: 'Get Question'
+api: 'GET /api/game/question'
+description: 'Generate a new crafting question for the game'
+---
+
+## Query Parameters
+
+<ParamField query="difficulty" type="string" default="MEDIUM">
+  The difficulty level of the question. Valid values are:
+  - `EASY` - Simple items with fewer components
+  - `MEDIUM` - Moderate complexity items
+  - `HARD` - Complex items with multiple components
+  
+  This parameter is optional and defaults to `MEDIUM` if not provided.
+</ParamField>
+
+## Response
+
+<ResponseField name="targetItemId" type="string" required>
+  The unique identifier of the target item to craft
+</ResponseField>
+
+<ResponseField name="targetItemName" type="string" required>
+  The display name of the target item
+</ResponseField>
+
+<ResponseField name="targetItemImageUrl" type="string" required>
+  URL to the image of the target item
+</ResponseField>
+
+<ResponseField name="correctComponentIds" type="List<String>" required>
+  List of item IDs that are the correct components to craft the target item
+</ResponseField>
+
+<ResponseField name="correctComponents" type="List<ItemOption>" required>
+  List of ItemOption objects representing the correct components with full details
+  
+  <Expandable title="ItemOption properties">
+    <ResponseField name="itemId" type="string">
+      The unique identifier of the component item
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The display name of the component
+    </ResponseField>
+    
+    <ResponseField name="imageUrl" type="string">
+      URL to the component's image
+    </ResponseField>
+    
+    <ResponseField name="cost" type="integer">
+      The gold cost of the component
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="options" type="List<ItemOption>" required>
+  List of all available options including correct components and distractors. Players must select the correct components from this list.
+</ResponseField>
+
+<ResponseField name="timeLimit" type="integer" required>
+  Time limit in seconds for answering this question
+</ResponseField>
+
+<ResponseField name="difficulty" type="string" required>
+  The difficulty level of this question (EASY, MEDIUM, or HARD)
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET "https://api.crafterlol.com/api/game/question?difficulty=HARD"
+```
+
+## Example Response
+
+```json
+{
+  "targetItemId": "3078",
+  "targetItemName": "Trinity Force",
+  "targetItemImageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3078.png",
+  "correctComponentIds": ["3044", "3051", "3057"],
+  "correctComponents": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    }
+  ],
+  "options": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    },
+    {
+      "itemId": "1001",
+      "name": "Boots",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1001.png",
+      "cost": 300
+    },
+    {
+      "itemId": "1036",
+      "name": "Long Sword",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/1036.png",
+      "cost": 350
+    }
+  ],
+  "timeLimit": 45,
+  "difficulty": "HARD"
+}
+```

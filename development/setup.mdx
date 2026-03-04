@@ -1,0 +1,184 @@
+---
+title: 'Development Environment Setup'
+description: 'Set up your local development environment for Crafter LoL'
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+<CardGroup cols={3}>
+  <Card title="Java 17" icon="java">
+    Required for Spring Boot backend
+  </Card>
+  <Card title="Maven 3.9+" icon="box">
+    Build tool for Java backend
+  </Card>
+  <Card title="Node.js 18+" icon="node-js">
+    Required for React frontend
+  </Card>
+</CardGroup>
+
+## Backend Setup
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone <repository-url>
+    cd crafter-lol
+    ```
+  </Step>
+
+  <Step title="Navigate to Backend Directory">
+    ```bash
+    cd source/Back/crafter
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Maven will automatically download dependencies when you build:
+    ```bash
+    mvn clean install
+    ```
+
+    <Note>
+      The backend uses **Spring Boot 4.0.3** with Java 17. Key dependencies include:
+      - Spring Boot Web for REST APIs
+      - Spring WebFlux for reactive WebClient
+      - Spring Cache with Caffeine for caching
+      - Lombok for reduced boilerplate
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create an `application.properties` file or set environment variables:
+    ```properties
+    PORT=5000
+    CORS_ORIGINS=http://localhost:5173
+    ```
+    
+    See [Environment Configuration](/development/environment-configuration) for full details.
+  </Step>
+
+  <Step title="Run the Backend">
+    ```bash
+    mvn spring-boot:run
+    ```
+
+    The server will start on `http://localhost:5000`
+  </Step>
+</Steps>
+
+## Frontend Setup
+
+<Steps>
+  <Step title="Navigate to Frontend Directory">
+    ```bash
+    cd source/Front/Crafter_League_of_Legends
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    ```bash
+    npm install
+    ```
+
+    <Note>
+      The frontend uses:
+      - **React 19.2.0** for UI
+      - **Vite 7.3.1** for fast development and building
+      - **Axios 1.13.5** for HTTP requests
+      - **Framer Motion 12.34.3** for animations
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the frontend root:
+    ```bash
+    VITE_API_URL=http://localhost:5000/api
+    ```
+  </Step>
+
+  <Step title="Run the Development Server">
+    ```bash
+    npm run dev
+    ```
+
+    The app will be available at `http://localhost:5173`
+  </Step>
+</Steps>
+
+## Verify Installation
+
+<Steps>
+  <Step title="Check Backend Health">
+    Open your browser and navigate to:
+    ```
+    http://localhost:5000/api/game/question
+    ```
+    
+    You should receive a JSON response with game data.
+  </Step>
+
+  <Step title="Check Frontend">
+    Open `http://localhost:5173` in your browser. You should see the game interface load with items from Data Dragon.
+  </Step>
+</Steps>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port Already in Use">
+    If port 5000 or 5173 is already in use:
+    
+    **Backend:** Change the port in `application.properties`:
+    ```properties
+    server.port=8080
+    ```
+    
+    **Frontend:** Vite will automatically try the next available port, or you can specify one:
+    ```bash
+    npm run dev -- --port 3000
+    ```
+  </Accordion>
+
+  <Accordion title="CORS Errors">
+    Ensure the `CORS_ORIGINS` environment variable in the backend matches your frontend URL:
+    ```properties
+    cors.allowed.origins=http://localhost:5173
+    ```
+  </Accordion>
+
+  <Accordion title="Maven Build Fails">
+    Ensure you're using Java 17:
+    ```bash
+    java -version
+    ```
+    
+    If not, install Java 17 and set `JAVA_HOME` appropriately.
+  </Accordion>
+
+  <Accordion title="Data Dragon API Timeout">
+    If you're experiencing timeouts, check your internet connection. The backend fetches item data from:
+    ```
+    https://ddragon.leagueoflegends.com
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Configuration" icon="gear" href="/development/environment-configuration">
+    Learn about all environment variables and configuration options
+  </Card>
+  <Card title="Backend Architecture" icon="server" href="/development/backend-architecture">
+    Understand the Spring Boot backend structure
+  </Card>
+  <Card title="Frontend Architecture" icon="react" href="/development/frontend-architecture">
+    Explore the React/Vite frontend architecture
+  </Card>
+  <Card title="Data Dragon Integration" icon="dragon" href="/development/data-dragon-integration">
+    Deep dive into API integration and caching
+  </Card>
+</CardGroup>

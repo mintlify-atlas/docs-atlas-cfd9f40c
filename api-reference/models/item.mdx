@@ -1,0 +1,133 @@
+---
+title: 'Item'
+description: 'Core data model representing a League of Legends item'
+---
+
+## Overview
+
+The `Item` model represents a League of Legends item with all its properties, stats, and crafting relationships. Items are loaded from the Riot Games Data Dragon API and used throughout the game for question generation and validation.
+
+## Fields
+
+<ResponseField name="id" type="String" required>
+  Unique identifier for the item (e.g., "3078", "6676")
+</ResponseField>
+
+<ResponseField name="name" type="String" required>
+  Display name of the item (e.g., "Trinity Force", "Kraken Slayer")
+</ResponseField>
+
+<ResponseField name="description" type="String" required>
+  HTML-formatted description of the item's effects and passive abilities
+</ResponseField>
+
+<ResponseField name="gold" type="Map<String, Object>" required>
+  Map containing gold cost information with keys:
+  - `total` (Integer) - Total gold cost of the item
+  - `base` (Integer) - Base cost excluding component costs
+  - `sell` (Integer) - Sell value of the item
+  - `purchasable` (Boolean) - Whether the item can be purchased
+</ResponseField>
+
+<ResponseField name="from" type="List<String>">
+  List of item IDs representing the components needed to craft this item. If this field is populated, the item is craftable. Empty or null for basic items.
+</ResponseField>
+
+<ResponseField name="into" type="List<String>">
+  List of item IDs representing items that can be crafted using this item as a component. Used to build upgrade paths.
+</ResponseField>
+
+<ResponseField name="image" type="Map<String, Object>" required>
+  Map containing image information with keys:
+  - `full` (String) - Filename of the full item image
+  - `sprite` (String) - Sprite sheet filename
+  - `group` (String) - Image group
+  - `x` (Integer) - X coordinate in sprite
+  - `y` (Integer) - Y coordinate in sprite
+  - `w` (Integer) - Width
+  - `h` (Integer) - Height
+</ResponseField>
+
+<ResponseField name="stats" type="Map<String, Object>">
+  Map of stat bonuses provided by the item. Keys are stat names (e.g., "FlatPhysicalDamageMod", "PercentAttackSpeedMod") and values are the numeric bonuses.
+</ResponseField>
+
+<ResponseField name="tags" type="List<String>">
+  List of category tags for the item (e.g., ["Damage", "CriticalStrike", "AttackSpeed"])
+</ResponseField>
+
+<ResponseField name="totalCost" type="Integer">
+  Computed field returning the total gold cost from the `gold.total` field. Returns 0 if not available.
+</ResponseField>
+
+<ResponseField name="imageUrl" type="String">
+  Computed field returning the full CDN URL to the item's image. Constructed from the `image.full` field.
+</ResponseField>
+
+## Utility Methods
+
+### isCraftableItem()
+
+Returns `true` if the item has components (the `from` field is not empty), indicating it can be crafted from other items.
+
+### getComponentCount()
+
+Returns the number of components required to craft this item (length of the `from` list). Returns 0 for non-craftable items.
+
+### getTotalCost()
+
+Getter method that returns the computed total cost from the `gold` map.
+
+### getImageUrl()
+
+Getter method that returns the computed full image URL.
+
+## Example JSON
+
+```json
+{
+  "id": "3078",
+  "name": "Trinity Force",
+  "description": "<mainText><stats><attention>40</attention> Attack Damage<br><attention>30</attention> Attack Speed<br><attention>30</attention> Ability Haste<br><attention>200</attention> Health<br><attention>200</attention> Mana</stats></mainText>",
+  "gold": {
+    "total": 3333,
+    "base": 333,
+    "sell": 2333,
+    "purchasable": true
+  },
+  "from": ["3044", "3051", "3057"],
+  "into": [],
+  "image": {
+    "full": "3078.png",
+    "sprite": "item2.png",
+    "group": "item",
+    "x": 192,
+    "y": 96,
+    "w": 48,
+    "h": 48
+  },
+  "stats": {
+    "FlatPhysicalDamageMod": 40,
+    "PercentAttackSpeedMod": 0.30,
+    "FlatHPPoolMod": 200,
+    "FlatMPPoolMod": 200
+  },
+  "tags": ["Damage", "AttackSpeed", "AbilityHaste", "Health", "Mana", "OnHit"],
+  "totalCost": 3333,
+  "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3078.png"
+}
+```
+
+## Item Difficulty Classification
+
+Items are classified by difficulty based on component count:
+- **EASY**: 2 components - Simple items like basic tier 2 items
+- **MEDIUM**: 3 components - Most legendary items
+- **HARD**: 4+ components - Complex mythic or legendary items
+
+## Notes
+
+- All items are loaded from the Riot Games Data Dragon API on application startup
+- The `@JsonIgnoreProperties(ignoreUnknown = true)` annotation allows the model to gracefully handle additional fields from the API
+- Only craftable items (those with the `from` field populated) are used for game questions
+- Item images are served from the Data Dragon CDN: `https://ddragon.leagueoflegends.com/cdn/{version}/img/item/{id}.png`

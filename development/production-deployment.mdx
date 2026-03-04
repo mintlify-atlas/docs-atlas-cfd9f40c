@@ -1,0 +1,734 @@
+---
+title: 'Production Deployment'
+description: 'Deploy Crafter LoL to production environments'
+---
+
+## Deployment Options
+
+Crafter LoL can be deployed to various platforms:
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker">
+    Simple single-server deployment
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra">
+    Scalable container orchestration
+  </Card>
+  <Card title="Cloud Platforms" icon="cloud">
+    AWS, GCP, Azure managed services
+  </Card>
+  <Card title="Platform as a Service" icon="server">
+    Heroku, Render, Railway
+  </Card>
+</CardGroup>
+
+## Pre-Deployment Checklist
+
+<Steps>
+  <Step title="Update Data Dragon Version">
+    Ensure you're using the latest League of Legends patch:
+    ```bash
+    curl https://ddragon.leagueoflegends.com/api/versions.json
+    ```
+    
+    Update `application.properties`:
+    ```properties
+    ddragon.version=16.3.1
+    ```
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Set production values for:
+    - `PORT`
+    - `CORS_ORIGINS`
+    - `ddragon.version`
+    - `VITE_API_URL`
+  </Step>
+
+  <Step title="Build Production Assets">
+    **Backend:**
+    ```bash
+    cd source/Back/crafter
+    mvn clean package -DskipTests
+    ```
+    
+    **Frontend:**
+    ```bash
+    cd source/Front/Crafter_League_of_Legends
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Security Review">
+    - Enable HTTPS
+    - Set restrictive CORS origins
+    - Use environment variables for secrets
+    - Implement rate limiting
+    - Review exposed ports
+  </Step>
+</Steps>
+
+## Docker Compose Deployment
+
+### Production docker-compose.yml
+
+Create `docker-compose.prod.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    image: crafter-lol-backend:latest
+    container_name: crafter-backend-prod
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - CORS_ORIGINS=${FRONTEND_URL}
+      - ddragon.version=16.3.1
+      - ddragon.language=es_MX
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/game/question"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    image: crafter-lol-frontend:latest
+    container_name: crafter-frontend-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Reverse proxy with Nginx
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+```
+
+### Deploy
+
+```bash
+# Set environment variables
+export FRONTEND_URL=https://yourdomain.com
+
+# Pull latest images
+docker-compose -f docker-compose.prod.yml pull
+
+# Start services
+docker-compose -f docker-compose.prod.yml up -d
+
+# Check status
+docker-compose -f docker-compose.prod.yml ps
+```
+
+## Kubernetes Deployment
+
+### Backend Deployment
+
+Create `k8s/backend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crafter-backend
+  labels:
+    app: crafter-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: crafter-backend
+  template:
+    metadata:
+      labels:
+        app: crafter-backend
+    spec:
+      containers:
+      - name: backend
+        image: crafter-lol-backend:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: crafter-config
+              key: frontend-url
+        - name: ddragon.version
+          value: "16.3.1"
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+          requests:
+            cpu: "500m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /api/game/question
+            port: 8080
+          initialDelaySeconds: 40
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/game/question
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crafter-backend-service
+spec:
+  selector:
+    app: crafter-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+```
+
+### Frontend Deployment
+
+Create `k8s/frontend-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crafter-frontend
+  labels:
+    app: crafter-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: crafter-frontend
+  template:
+    metadata:
+      labels:
+        app: crafter-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: crafter-lol-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "128Mi"
+          requests:
+            cpu: "250m"
+            memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crafter-frontend-service
+spec:
+  selector:
+    app: crafter-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+```
+
+### ConfigMap
+
+Create `k8s/configmap.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crafter-config
+data:
+  frontend-url: "https://yourdomain.com"
+  ddragon-version: "16.3.1"
+  ddragon-language: "es_MX"
+```
+
+### Deploy to Kubernetes
+
+```bash
+# Apply configurations
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
+
+# Check status
+kubectl get pods
+kubectl get services
+
+# View logs
+kubectl logs -f deployment/crafter-backend
+```
+
+## AWS Deployment
+
+### Using AWS Elastic Beanstalk
+
+<Steps>
+  <Step title="Install EB CLI">
+    ```bash
+    pip install awsebcli
+    ```
+  </Step>
+
+  <Step title="Initialize Application">
+    ```bash
+    cd source/Back/crafter
+    eb init -p docker crafter-lol-backend
+    ```
+  </Step>
+
+  <Step title="Create Environment">
+    ```bash
+    eb create crafter-prod-env \
+      --instance-type t3.medium \
+      --envvars PORT=8080,CORS_ORIGINS=https://yourdomain.com
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    eb deploy
+    ```
+  </Step>
+
+  <Step title="Check Status">
+    ```bash
+    eb status
+    eb logs
+    ```
+  </Step>
+</Steps>
+
+### Using AWS ECS (Fargate)
+
+<Steps>
+  <Step title="Push Images to ECR">
+    ```bash
+    # Authenticate
+    aws ecr get-login-password --region us-east-1 | \
+      docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+
+    # Tag and push backend
+    docker tag crafter-lol-backend:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/crafter-backend:latest
+    docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/crafter-backend:latest
+
+    # Tag and push frontend
+    docker tag crafter-lol-frontend:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/crafter-frontend:latest
+    docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/crafter-frontend:latest
+    ```
+  </Step>
+
+  <Step title="Create Task Definition">
+    Use AWS Console or CLI to create ECS task definition with:
+    - Backend container: 512 CPU, 1024 Memory
+    - Frontend container: 256 CPU, 512 Memory
+    - Environment variables
+  </Step>
+
+  <Step title="Create ECS Service">
+    - Choose Fargate launch type
+    - Configure load balancer
+    - Set desired task count (2-3 for HA)
+    - Enable auto-scaling
+  </Step>
+</Steps>
+
+## Heroku Deployment
+
+### Backend on Heroku
+
+<Steps>
+  <Step title="Install Heroku CLI">
+    ```bash
+    curl https://cli-assets.heroku.com/install.sh | sh
+    ```
+  </Step>
+
+  <Step title="Login and Create App">
+    ```bash
+    heroku login
+    heroku create crafter-lol-backend
+    ```
+  </Step>
+
+  <Step title="Set Environment Variables">
+    ```bash
+    heroku config:set \
+      CORS_ORIGINS=https://crafter-lol-frontend.herokuapp.com \
+      ddragon.version=16.3.1
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    cd source/Back/crafter
+    git init
+    heroku git:remote -a crafter-lol-backend
+    git add .
+    git commit -m "Initial deploy"
+    git push heroku master
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Heroku automatically detects the Dockerfile and builds the image.
+</Note>
+
+## Environment-Specific Configuration
+
+### Backend
+
+Create `application-prod.properties`:
+
+```properties
+# Server
+server.port=${PORT:8080}
+
+# Data Dragon
+ddragon.base.url=https://ddragon.leagueoflegends.com
+ddragon.version=${DDRAGON_VERSION:16.3.1}
+ddragon.language=${DDRAGON_LANGUAGE:es_MX}
+
+# CORS
+cors.allowed.origins=${CORS_ORIGINS}
+
+# Cache - longer TTL in production
+spring.cache.caffeine.spec=maximumSize=1000,expireAfterWrite=48h
+
+# Logging
+logging.level.com.crafter.league.of.legends=INFO
+logging.level.org.springframework.web=WARN
+```
+
+Activate with:
+```bash
+java -jar app.jar --spring.profiles.active=prod
+```
+
+Or in Docker:
+```dockerfile
+ENTRYPOINT ["java", "-Dspring.profiles.active=prod", "-jar", "app.jar"]
+```
+
+### Frontend
+
+Create `.env.production`:
+
+```bash
+VITE_API_URL=https://api.yourdomain.com/api
+```
+
+Build with:
+```bash
+npm run build
+```
+
+## SSL/TLS Configuration
+
+### Let's Encrypt with Certbot
+
+```bash
+# Install Certbot
+sudo apt-get install certbot
+
+# Obtain certificate
+sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
+
+# Certificates stored at:
+# /etc/letsencrypt/live/yourdomain.com/fullchain.pem
+# /etc/letsencrypt/live/yourdomain.com/privkey.pem
+```
+
+### Nginx SSL Configuration
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Backend proxy
+    location /api/ {
+        proxy_pass http://backend:8080/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Frontend
+    location / {
+        proxy_pass http://frontend:80/;
+        proxy_set_header Host $host;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+## Monitoring and Logging
+
+### Application Logs
+
+**Docker Compose:**
+```bash
+docker-compose logs -f --tail=100 backend
+```
+
+**Kubernetes:**
+```bash
+kubectl logs -f deployment/crafter-backend --tail=100
+```
+
+### Metrics with Spring Boot Actuator
+
+Add to `pom.xml`:
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+Enable endpoints in `application-prod.properties`:
+```properties
+management.endpoints.web.exposure.include=health,metrics,info
+management.endpoint.health.show-details=always
+```
+
+Access:
+- Health: `GET /actuator/health`
+- Metrics: `GET /actuator/metrics`
+- Cache stats: `GET /actuator/metrics/cache.gets`
+
+## Performance Optimization
+
+<AccordionGroup>
+  <Accordion title="Enable HTTP/2">
+    Improves load times for assets:
+    ```nginx
+    listen 443 ssl http2;
+    ```
+  </Accordion>
+
+  <Accordion title="CDN for Static Assets">
+    Use CloudFront, Cloudflare, or similar for frontend assets.
+  </Accordion>
+
+  <Accordion title="Database Connection Pooling">
+    If you add a database:
+    ```properties
+    spring.datasource.hikari.maximum-pool-size=10
+    spring.datasource.hikari.minimum-idle=5
+    ```
+  </Accordion>
+
+  <Accordion title="JVM Tuning">
+    Optimize garbage collection:
+    ```dockerfile
+    ENTRYPOINT ["java", \
+      "-XX:+UseG1GC", \
+      "-XX:MaxGCPauseMillis=200", \
+      "-XX:+UseContainerSupport", \
+      "-XX:MaxRAMPercentage=75.0", \
+      "-jar", "app.jar"]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Rollback Strategy
+
+### Docker Tags
+
+Always tag images with version:
+```bash
+docker build -t crafter-lol-backend:v1.2.3 .
+docker tag crafter-lol-backend:v1.2.3 crafter-lol-backend:latest
+```
+
+Rollback:
+```bash
+docker-compose down
+docker-compose up -d crafter-lol-backend:v1.2.2
+```
+
+### Kubernetes
+
+```bash
+# View rollout history
+kubectl rollout history deployment/crafter-backend
+
+# Rollback to previous version
+kubectl rollout undo deployment/crafter-backend
+
+# Rollback to specific revision
+kubectl rollout undo deployment/crafter-backend --to-revision=2
+```
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Use HTTPS Everywhere">
+    Enforce HTTPS for all traffic. Use HSTS header:
+    ```nginx
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    ```
+  </Step>
+
+  <Step title="Restrict CORS">
+    Never use `*` in production:
+    ```properties
+    cors.allowed.origins=https://yourdomain.com,https://www.yourdomain.com
+    ```
+  </Step>
+
+  <Step title="Rate Limiting">
+    Implement rate limiting on API endpoints to prevent abuse.
+  </Step>
+
+  <Step title="Security Headers">
+    Add security headers in Nginx:
+    ```nginx
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    ```
+  </Step>
+
+  <Step title="Keep Dependencies Updated">
+    Regularly update dependencies:
+    ```bash
+    mvn versions:display-dependency-updates
+    npm outdated
+    ```
+  </Step>
+</Steps>
+
+## Backup and Disaster Recovery
+
+<Info>
+  Crafter LoL is stateless - no database backups needed. However, ensure you have:
+</Info>
+
+- Source code in version control (Git)
+- Docker images in registry (ECR, Docker Hub)
+- Configuration backed up (`.env` files, Kubernetes configs)
+- SSL certificates backed up
+
+## Troubleshooting Production Issues
+
+<AccordionGroup>
+  <Accordion title="502 Bad Gateway">
+    **Causes:**
+    - Backend container not running
+    - Backend health check failing
+    - Wrong port configuration
+    
+    **Debug:**
+    ```bash
+    docker ps  # Check if backend is running
+    docker logs crafter-backend  # Check for errors
+    curl http://localhost:8080/api/game/question  # Test directly
+    ```
+  </Accordion>
+
+  <Accordion title="CORS Errors in Production">
+    **Cause:** `CORS_ORIGINS` doesn't match frontend domain
+    
+    **Fix:**
+    ```bash
+    # Check current value
+    docker exec crafter-backend env | grep CORS
+    
+    # Update and restart
+    docker-compose down
+    export CORS_ORIGINS=https://yourdomain.com
+    docker-compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="Out of Memory Errors">
+    **Symptoms:** Container keeps restarting, logs show `OutOfMemoryError`
+    
+    **Solutions:**
+    1. Increase container memory limit
+    2. Reduce `MaxRAMPercentage`
+    3. Analyze heap dump:
+       ```bash
+       docker exec crafter-backend jmap -dump:live,format=b,file=/tmp/heap.bin 1
+       ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/development/docker-deployment">
+    Review Docker fundamentals
+  </Card>
+  <Card title="Environment Configuration" icon="gear" href="/development/environment-configuration">
+    Configure for different environments
+  </Card>
+</CardGroup>

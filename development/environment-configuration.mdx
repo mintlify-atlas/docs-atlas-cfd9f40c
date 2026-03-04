@@ -1,0 +1,292 @@
+---
+title: 'Environment Configuration'
+description: 'Complete reference for environment variables and configuration'
+---
+
+## Backend Configuration
+
+The backend uses Spring Boot's `application.properties` for configuration. Located at:
+```
+source/Back/crafter/src/main/resources/application.properties
+```
+
+### Server Configuration
+
+```properties
+# Server port (default: 5000)
+server.port=${PORT:5000}
+
+# Application name
+spring.application.name=crafter
+```
+
+<ParamField path="PORT" type="number" default="5000">
+  The port on which the Spring Boot server runs. Can be overridden via environment variable.
+</ParamField>
+
+### Data Dragon API Configuration
+
+<Note>
+  Data Dragon is Riot Games' CDN for League of Legends static assets and data.
+</Note>
+
+```properties
+# Data Dragon base URL
+ddragon.base.url=https://ddragon.leagueoflegends.com
+
+# Game version (update periodically)
+ddragon.version=16.3.1
+
+# Language for item names and descriptions
+ddragon.language=es_MX
+```
+
+<ParamField path="ddragon.base.url" type="string" default="https://ddragon.leagueoflegends.com">
+  Base URL for Data Dragon API. Should not need to change unless using a mirror.
+</ParamField>
+
+<ParamField path="ddragon.version" type="string" default="16.3.1">
+  League of Legends patch version. Update this when new patches are released to get latest item data.
+  
+  Find current version at: https://ddragon.leagueoflegends.com/api/versions.json
+</ParamField>
+
+<ParamField path="ddragon.language" type="string" default="es_MX">
+  Language code for localized item data. Options include:
+  - `en_US` - English (US)
+  - `es_MX` - Spanish (Mexico)
+  - `es_ES` - Spanish (Spain)
+  - `pt_BR` - Portuguese (Brazil)
+  - And more...
+</ParamField>
+
+### Cache Configuration
+
+```properties
+# Cache type
+spring.cache.type=caffeine
+
+# Caffeine cache specification
+spring.cache.caffeine.spec=maximumSize=500,expireAfterWrite=24h
+```
+
+<Info>
+  The application uses **Caffeine** cache to store Data Dragon responses and reduce API calls.
+</Info>
+
+<ParamField path="spring.cache.type" type="string" default="caffeine">
+  Cache provider. Set to `caffeine` for in-memory caching with high performance.
+</ParamField>
+
+<ParamField path="spring.cache.caffeine.spec" type="string" default="maximumSize=500,expireAfterWrite=24h">
+  Caffeine cache specification:
+  - `maximumSize=500`: Maximum number of entries
+  - `expireAfterWrite=24h`: Cache entries expire after 24 hours
+</ParamField>
+
+### CORS Configuration
+
+```properties
+# Allowed origins for cross-origin requests
+cors.allowed.origins=${CORS_ORIGINS:http://localhost:5173}
+```
+
+<ParamField path="CORS_ORIGINS" type="string" default="http://localhost:5173">
+  Comma-separated list of allowed origins for CORS. In production, set this to your frontend domain:
+  ```
+  CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+  ```
+</ParamField>
+
+<Warning>
+  Never use `*` for CORS origins in production. Always specify exact domains.
+</Warning>
+
+### WebClient Configuration
+
+```properties
+# Connection timeout in milliseconds
+webclient.timeout.connect=5000
+
+# Read timeout in milliseconds
+webclient.timeout.read=10000
+
+# Buffer size for large responses (5MB)
+webclient.buffer.size=5242880
+```
+
+<ParamField path="webclient.timeout.connect" type="number" default="5000">
+  Connection timeout in milliseconds for Data Dragon API requests.
+</ParamField>
+
+<ParamField path="webclient.timeout.read" type="number" default="10000">
+  Read timeout in milliseconds. Data Dragon responses can be large (500KB+).
+</ParamField>
+
+<ParamField path="webclient.buffer.size" type="number" default="5242880">
+  Maximum buffer size (5MB) for in-memory response handling. Required for large Data Dragon JSON responses.
+</ParamField>
+
+### Logging Configuration
+
+```properties
+# Application logging level
+logging.level.com.lol.itemgame=INFO
+
+# Spring Web logging
+logging.level.org.springframework.web=INFO
+
+# Console log pattern
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+```
+
+## Frontend Configuration
+
+The frontend uses Vite's environment variable system with `.env` files.
+
+### Environment Variables
+
+Create a `.env` file in the frontend root directory:
+
+```bash
+# API base URL
+VITE_API_URL=http://localhost:5000/api
+```
+
+<ParamField path="VITE_API_URL" type="string" default="http://localhost:5000/api">
+  Backend API base URL. All API requests are prefixed with this URL.
+  
+  **Development:** `http://localhost:5000/api`
+  
+  **Production:** `https://api.yourdomain.com/api`
+</ParamField>
+
+<Note>
+  All Vite environment variables must be prefixed with `VITE_` to be exposed to the frontend code.
+</Note>
+
+### Usage in Code
+
+The API URL is configured in `constants/theme.js`:
+
+```javascript
+// API Configuration
+export const API_CONFIG = {
+  // Reads VITE_API_URL, falls back to localhost
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  endpoints: {
+    question: '/game/question',
+    validate: '/game/validate',
+  },
+};
+```
+
+### Game Configuration
+
+Game mechanics are configured in `constants/theme.js`:
+
+```javascript
+export const GAME_CONFIG = {
+  timePerQuestion: 15,      // Time limit in seconds
+  pointsPerCorrect: 100,    // Points awarded for correct answer
+  pointsPerIncorrect: 50,   // Points deducted for incorrect answer
+  itemsInCircle: 14,        // Number of items displayed in circle
+  circleRadius: 270,        // Radius of item circle in pixels
+  centralItemSize: 120,     // Size of central target item
+  peripheralItemSize: 64,   // Size of selectable items
+  maxSlots: 2,              // Number of components in recipe
+};
+```
+
+### Color Theme
+
+```javascript
+export const COLORS = {
+  background: '#0A1428',     // Main background
+  accentGold: '#C89B3C',     // Primary accent (gold)
+  magicBlue: '#0BC6E3',      // Secondary accent (blue)
+  progressGreen: '#00BFA5',  // Progress indicators
+  panelDark: '#1A2332',      // Panel backgrounds
+  textMain: '#F0E6D2',       // Main text color
+  itemBorder: '#463714',     // Item border color
+  successGreen: '#00FF88',   // Success feedback
+  errorRed: '#FF4444',       // Error feedback
+};
+```
+
+## Environment-Specific Configuration
+
+### Development
+
+**Backend `.env` or environment variables:**
+```bash
+PORT=5000
+CORS_ORIGINS=http://localhost:5173
+```
+
+**Frontend `.env`:**
+```bash
+VITE_API_URL=http://localhost:5000/api
+```
+
+### Production
+
+**Backend environment variables:**
+```bash
+PORT=8080
+CORS_ORIGINS=https://yourdomain.com
+ddragon.version=16.3.1
+```
+
+**Frontend `.env.production`:**
+```bash
+VITE_API_URL=https://api.yourdomain.com/api
+```
+
+<Warning>
+  Always use HTTPS in production for both frontend and backend.
+</Warning>
+
+## Configuration Validation
+
+To verify your configuration:
+
+<Steps>
+  <Step title="Backend Health Check">
+    ```bash
+    curl http://localhost:5000/api/game/question
+    ```
+    
+    Should return a JSON game question.
+  </Step>
+
+  <Step title="CORS Check">
+    Open browser console on frontend and check for CORS errors. If you see:
+    ```
+    Access to XMLHttpRequest blocked by CORS policy
+    ```
+    
+    Verify `CORS_ORIGINS` matches your frontend URL exactly.
+  </Step>
+
+  <Step title="Cache Verification">
+    Check logs for cache hits:
+    ```
+    Fetching items from Data Dragon API - Version: 16.3.1, Language: es_MX
+    Successfully fetched and cached 200 items
+    ```
+    
+    Subsequent requests should use cache (no API calls logged).
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Dragon Integration" icon="dragon" href="/development/data-dragon-integration">
+    Learn how caching and API integration works
+  </Card>
+  <Card title="Backend Architecture" icon="server" href="/development/backend-architecture">
+    Understand the Spring Boot service layer
+  </Card>
+</CardGroup>

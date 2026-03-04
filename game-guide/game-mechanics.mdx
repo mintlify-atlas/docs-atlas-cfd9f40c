@@ -1,0 +1,379 @@
+---
+title: Game Mechanics
+description: Deep dive into how Crafter LoL generates questions and validates answers
+---
+
+# Game Mechanics
+
+Understand the technical implementation behind Crafter LoL's question generation, answer validation, and scoring system.
+
+## Question Generation
+
+The backend generates questions dynamically by selecting random craftable items from the League of Legends item database.
+
+### Selection Process
+
+<Steps>
+  <Step title="Random Item Selection">
+    The game service selects a random craftable item as the target:
+
+    ```java
+    // From GameService.java:42-43
+    List<Item> itemList = new ArrayList<>(craftableItems.values());
+    Item targetItem = itemList.get(random.nextInt(itemList.size()));
+    ```
+
+    <Info>
+      Only items that have crafting components (items with a "from" list) are eligible as targets.
+    </Info>
+  </Step>
+
+  <Step title="Extract Correct Components">
+    The system retrieves the item's actual crafting recipe:
+
+    ```java
+    // From GameService.java:48-66
+    List<String> correctComponentIds = targetItem.getFrom();
+
+    Map<String, Item> allItems = itemService.getAllItems();
+    List<ItemOption> correctComponents = correctComponentIds.stream()
+        .map(allItems::get)
+        .filter(Objects::nonNull)
+        .map(item -> ItemOption.builder()
+            .itemId(item.getId())
+            .name(item.getName())
+            .imageUrl(item.getImageUrl())
+            .cost(item.getTotalCost())
+            .build())
+        .collect(Collectors.toList());
+    ```
+
+    Each component includes:
+    - Unique item ID
+    - Display name
+    - Image URL (from Riot's CDN)
+    - Total gold cost
+  </Step>
+
+  <Step title="Generate Distractor Items">
+    The system adds incorrect items to create the challenge:
+
+    ```java
+    // From GameService.java:69-74
+    int totalOptions = getTotalOptions(difficulty);
+    List<ItemOption> options = generateOptions(
+        correctComponentIds,
+        totalOptions,
+        difficulty
+    );
+    ```
+
+    The number of options depends on difficulty:
+    - **Easy**: 6 total options
+    - **Medium**: 10 total options  
+    - **Hard**: 14 total options
+  </Step>
+
+  <Step title="Return Complete Question">
+    The backend returns a structured question object:
+
+    ```java
+    // From GameService.java:76-86
+    return GameQuestion.builder()
+        .targetItemId(targetItem.getId())
+        .targetItemName(targetItem.getName())
+        .targetItemImageUrl(targetItem.getImageUrl())
+        .correctComponentIds(correctComponentIds)
+        .correctComponents(correctComponents)
+        .options(options)
+        .timeLimit(getTimeLimit(difficulty))
+        .difficulty(difficulty)
+        .build();
+    ```
+  </Step>
+</Steps>
+
+## Distractor Generation
+
+The most sophisticated part of the game mechanics is how distractor items are chosen, especially on Hard difficulty.
+
+### Easy and Medium Difficulty
+
+On Easy and Medium modes, distractors are randomly selected from the item pool:
+
+```java
+// From GameService.java:217-227
+List<Item> fallback = allItems.values().stream()
+    .filter(item -> !addedIds.contains(item.getId()))
+    .filter(item -> item.getTotalCost() > 0)
+    .collect(Collectors.toList());
+Collections.shuffle(fallback);
+for (Item d : fallback) {
+    if (options.size() >= totalOptions) break;
+    options.add(toOption(d));
+    addedIds.add(d.getId());
+}
+```
+
+### Hard Difficulty - Smart Distractors
+
+Hard mode uses an intelligent algorithm to select distractors that are similar to the correct components:
+
+<Tabs>
+  <Tab title="Phase 1: Tag-Based">
+    First, the system collects tags from correct components:
+
+    ```java
+    // From GameService.java:170-174
+    Set<String> correctTags = correctComponentIds.stream()
+        .map(allItems::get)
+        .filter(Objects::nonNull)
+        .flatMap(item -> item.getTags() != null ? 
+            item.getTags().stream() : Stream.empty())
+        .collect(Collectors.toSet());
+    ```
+
+    Then selects items sharing tags AND similar cost:
+
+    ```java
+    // From GameService.java:186-193
+    List<Item> smartDistractors = allItems.values().stream()
+        .filter(item -> !addedIds.contains(item.getId()))
+        .filter(item -> item.getTotalCost() >= costMin && 
+                        item.getTotalCost() <= costMax)
+        .filter(item -> item.getTags() != null &&
+            !Collections.disjoint(item.getTags(), correctTags))
+        .collect(Collectors.toList());
+    ```
+
+    <Info>
+      Tags include categories like "Damage", "CriticalStrike", "SpellDamage", "Armor", etc.
+    </Info>
+  </Tab>
+
+  <Tab title="Phase 2: Cost-Based">
+    If not enough tag-based distractors are found, add items with similar costs:
+
+    ```java
+    // From GameService.java:176-184
+    int avgCost = (int) correctComponentIds.stream()
+        .map(allItems::get)
+        .filter(Objects::nonNull)
+        .mapToInt(Item::getTotalCost)
+        .average()
+        .orElse(1000);
+
+    int costMin = (int) (avgCost * 0.5);  // 50% of average
+    int costMax = (int) (avgCost * 2.0);  // 200% of average
+    ```
+
+    ```java
+    // From GameService.java:202-212
+    List<Item> costDistractors = allItems.values().stream()
+        .filter(item -> !addedIds.contains(item.getId()))
+        .filter(item -> item.getTotalCost() >= costMin && 
+                        item.getTotalCost() <= costMax)
+        .collect(Collectors.toList());
+    ```
+  </Tab>
+
+  <Tab title="Phase 3: Fallback">
+    If still not enough, add random items as final fallback:
+
+    ```java
+    // From GameService.java:217-228
+    if (options.size() < totalOptions) {
+        List<Item> fallback = allItems.values().stream()
+            .filter(item -> !addedIds.contains(item.getId()))
+            .filter(item -> item.getTotalCost() > 0)
+            .collect(Collectors.toList());
+        Collections.shuffle(fallback);
+        // Add until we reach totalOptions
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  On Hard difficulty, distractors are specifically chosen to trick you! They'll have similar attributes to the correct answer.
+</Warning>
+
+## Answer Validation
+
+When you submit an answer, the backend validates your selection:
+
+<Steps>
+  <Step title="Receive Answer">
+    Frontend sends selected component IDs:
+
+    ```javascript
+    // From gameService.js:73-77
+    async validateAnswer(targetItemId, selectedComponentIds){
+      const response = await api.post(API_CONFIG.endpoints.validate, {
+        targetItemId, selectedComponentIds
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Validate Combination">
+    Backend checks if the components match:
+
+    ```java
+    // From GameService.java:89-92
+    boolean isCorrect = itemService.isValidCraftingCombination(
+        request.getTargetItemId(),
+        request.getSelectedComponentIds()
+    );
+    ```
+
+    The validation checks:
+    - Do the selected IDs match the target item's "from" list?
+    - Are they in the correct quantity (some items need duplicates)?
+    - Is the combination exactly right (no extra or missing items)?
+  </Step>
+
+  <Step title="Calculate Score">
+    Points are calculated based on component count:
+
+    ```java
+    // From GameService.java:259-271
+    private int calculateScore(int componentCount) {
+        int baseScore = componentCount * 50;
+
+        // Bonus for complexity
+        if (componentCount >= 3) {
+            baseScore += 100;
+        } else if (componentCount == 2) {
+            baseScore += 50;
+        }
+
+        return baseScore;
+    }
+    ```
+
+    <Note>
+      While the backend calculates dynamic scores, the frontend currently uses fixed values (100 correct / 50 incorrect) from GAME_CONFIG.
+    </Note>
+  </Step>
+
+  <Step title="Return Result">
+    Backend sends back the validation result:
+
+    ```java
+    // From GameService.java:133-141
+    return ValidationResponse.builder()
+        .correct(isCorrect)
+        .correctComponentIds(correctIds)
+        .correctComponentNames(correctNames)
+        .correctComponents(correctComponents)
+        .incorrectComponentIds(incorrectIds)
+        .message(message)
+        .scorePoints(scorePoints)
+        .build();
+    ```
+  </Step>
+</Steps>
+
+## Frontend Data Adaptation
+
+The frontend adapts backend responses to its internal data structure:
+
+```javascript
+// From gameService.js:12-52
+function adaptBackendResponse(backendData) {
+    // Transform targetItem
+    const targetItem = {
+        id: backendData.targetItemId,
+        name: backendData.targetItemName,
+        imageUrl: backendData.targetItemImageUrl,
+    };
+
+    // Transform options - change itemId to id
+    const options = backendData.options.map(item => ({
+        id: item.itemId,
+        name: item.name,
+        imageUrl: item.imageUrl,
+        cost: item.cost,
+    }));
+
+    // Transform correctComponents
+    const correctComponents = backendData.correctComponents?.map(item => ({
+        id: item.itemId || item.id,
+        name: item.name,
+        imageUrl: item.imageUrl,
+    })) || [];
+
+    return {
+        targetItem,
+        options,
+        correctComponents,
+        correctComponentIds: backendData.correctComponentIds,
+        timeLimit: backendData.timeLimit,
+        difficulty: backendData.difficulty,
+    };
+}
+```
+
+<Info>
+  This adapter pattern allows the frontend and backend to evolve independently while maintaining compatibility.
+</Info>
+
+## Timer Mechanics
+
+The timer has special behavior to improve user experience:
+
+```jsx
+// From App.jsx:50-66
+useEffect(() => {
+  if (!gameData || feedback || timeLeft <= 0) return;
+  if (selectedItems.length >= requiredSlots) return; // PAUSE when slots full
+
+  const timer = setInterval(() => {
+    setTimeLeft((prev) => {
+      if (prev <= 1) {
+        handleTimeout();
+        return 0;
+      }
+      return prev - 1;
+    });
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [gameData, feedback, timeLeft, selectedItems.length, requiredSlots]);
+```
+
+**Timer States**:
+- **Running**: Counting down normally
+- **Paused**: All slots filled (gives you time to review)
+- **Stopped**: Feedback shown or time expired
+- **Reset**: New question loaded
+
+<Tip>
+  The auto-pause when slots are full prevents accidental timeouts and lets you think about your selection!
+</Tip>
+
+## State Management
+
+The game uses React hooks for state management:
+
+```jsx
+// From App.jsx:15-22
+const [gameData, setGameData] = useState(null);
+const [selectedItems, setSelectedItems] = useState([]);
+const [score, setScore] = useState(storageService.getScore());
+const [bestScore, setBestScore] = useState(storageService.getBestScore());
+const [timeLeft, setTimeLeft] = useState(GAME_CONFIG.timePerQuestion);
+const [feedback, setFeedback] = useState(null);
+const [isLoading, setIsLoading] = useState(true);
+const [error, setError] = useState(null);
+```
+
+<CardGroup cols={2}>
+  <Card title="Difficulty Levels" icon="chart-line" href="/game-guide/difficulty-levels">
+    Learn about Easy, Medium, and Hard mode differences
+  </Card>
+  <Card title="Scoring System" icon="trophy" href="/game-guide/scoring-system">
+    Understand how points are calculated and tracked
+  </Card>
+</CardGroup>

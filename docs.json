@@ -1,122 +1,95 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Crafter LoL",
+  "theme": "almond",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#fbc926",
+    "light": "#8c73fa"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/8b9eca70-8cef-4590-b10e-8d9fc63151eb.svg",
+  "logo": {
+    "light": "https://media.brand.dev/8b9eca70-8cef-4590-b10e-8d9fc63151eb.svg",
+    "dark": "https://media.brand.dev/8b9eca70-8cef-4590-b10e-8d9fc63151eb.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Jordavid/Craffter_lol"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Jordavid/Craffter_lol"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
           },
           {
-            "group": "Customization",
+            "group": "Game Guide",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "game-guide/how-to-play",
+              "game-guide/game-mechanics",
+              "game-guide/difficulty-levels",
+              "game-guide/scoring-system"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Development",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Setup",
             "pages": [
-              "api-reference/introduction"
+              "development/setup",
+              "development/environment-configuration"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Architecture",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "development/frontend-architecture",
+              "development/backend-architecture",
+              "development/data-dragon-integration"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "development/docker-deployment",
+              "development/production-deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/game/get-question",
+              "api-reference/game/validate-answer",
+              "api-reference/items/get-all-items"
+            ]
+          },
+          {
+            "group": "Data Models",
+            "pages": [
+              "api-reference/models/game-question",
+              "api-reference/models/validation-response",
+              "api-reference/models/item"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

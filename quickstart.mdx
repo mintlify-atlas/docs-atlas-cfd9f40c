@@ -1,80 +1,224 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart Guide
+description: Get Crafter LoL running on your local machine in minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
+Get Crafter LoL up and running on your local machine in just a few minutes. This guide will walk you through cloning the repository, setting up the backend, and launching the frontend.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Before you begin, make sure you have the following installed:
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+<CardGroup cols={3}>
+  <Card title="Java 17+" icon="java">
+    Required for running the Spring Boot backend
+  </Card>
+  <Card title="Maven 3.6+" icon="box">
+    Build tool for the Java backend
+  </Card>
+  <Card title="Node.js 16+" icon="node-js">
+    Required for the React frontend
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  You can verify your installations by running `java -version`, `mvn -version`, and `node -version` in your terminal.
 </Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    Start by cloning the Crafter LoL repository to your local machine.
+    
+    ```bash
+    git clone https://github.com/Jordavid/Craffter_lol.git
+    cd Craffter_lol
+    ```
+    
+    The repository contains two main directories:
+    - `Back/crafter` - Spring Boot backend
+    - `Front/Crafter_League_of_Legends` - React frontend
+  </Step>
+  
+  <Step title="Set up and start the backend">
+    Navigate to the backend directory and start the Spring Boot server.
+    
+    ```bash
+    cd Back/crafter
+    mvn spring-boot:run
+    ```
+    
+    The backend will:
+    - Start on `http://localhost:8080`
+    - Fetch League of Legends item data from the Data Dragon API
+    - Cache item data for fast responses
+    - Expose REST endpoints at `/api/game/*`
+    
+    <Accordion title="Backend startup logs">
+      You should see output similar to this:
+      
+      ```
+      INFO  Fetching items from Data Dragon API - Version: 14.1.1, Language: en_US
+      INFO  Successfully fetched and cached 200 items
+      INFO  Found 150 craftable items out of 200 total items
+      INFO  Tomcat started on port(s): 8080 (http)
+      INFO  Started CrafterApplication in 3.456 seconds
+      ```
+    </Accordion>
+    
+    <Warning>
+      The backend requires internet access to fetch item data from the Riot Games Data Dragon API on first startup.
+    </Warning>
+  </Step>
+  
+  <Step title="Launch the frontend">
+    In a new terminal window, navigate to the frontend directory and start the React app.
+    
+    ```bash
+    cd Front/Crafter_League_of_Legends
+    npm install
+    npm run dev
+    ```
+    
+    The frontend will:
+    - Install all dependencies (React, Axios, Framer Motion, etc.)
+    - Start the Vite dev server
+    - Open your browser automatically to `http://localhost:5173`
+    
+    <Info>
+      If your browser doesn't open automatically, check the terminal output for the exact URL and port number.
+    </Info>
+  </Step>
+  
+  <Step title="Start playing!">
+    Once both servers are running, you can start playing:
+    
+    1. The game will load and display a random craftable item in the center
+    2. Select the correct component items from the options around it
+    3. Click the submit button to check your answer
+    4. Earn points for correct answers and track your score!
+    
+    <Tip>
+      Start with Easy difficulty to learn the game mechanics, then challenge yourself with Medium or Hard modes.
+    </Tip>
+  </Step>
+</Steps>
+
+## Configuration Options
+
+### Backend Configuration
+
+The backend uses default settings that work out of the box. If you need to customize the configuration, edit `Back/crafter/src/main/resources/application.properties`:
+
+<CodeGroup>
+```properties application.properties
+# Data Dragon API Configuration
+ddragon.version=14.1.1
+ddragon.language=en_US
+ddragon.base.url=https://ddragon.leagueoflegends.com
+
+# Server Port
+server.port=8080
+
+# Cache Configuration
+spring.cache.type=caffeine
+spring.cache.caffeine.spec=expireAfterWrite=1h,maximumSize=500
+```
+</CodeGroup>
+
+### Frontend Configuration
+
+The frontend connects to the backend API. If you changed the backend port, update the frontend configuration:
+
+<CodeGroup>
+```bash .env
+VITE_API_URL=http://localhost:8080/api
+```
+</CodeGroup>
+
+Create this `.env` file in `Front/Crafter_League_of_Legends/` if it doesn't exist.
+
+## Verification
+
+After completing the setup, verify everything is working:
+
+<Accordion title="Backend health check">
+  Test the backend API by fetching a random question:
+  
+  ```bash
+  curl http://localhost:8080/api/game/question?difficulty=MEDIUM
+  ```
+  
+  You should receive a JSON response with a target item and component options.
+</Accordion>
+
+<Accordion title="Frontend connection test">
+  Open the browser console (F12) and check for any errors. You should see successful API calls to the backend:
+  
+  ```
+  GET http://localhost:8080/api/game/question?difficulty=MEDIUM 200 OK
+  ```
+</Accordion>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Backend port already in use">
+    If port 8080 is already in use, you can change it:
+    
+    1. Edit `application.properties` and set `server.port=8081`
+    2. Update the frontend `.env` file: `VITE_API_URL=http://localhost:8081/api`
+    3. Restart both servers
+  </Accordion>
+  
+  <Accordion title="CORS errors in browser console">
+    The backend includes CORS configuration for `http://localhost:5173`. If your frontend runs on a different port:
+    
+    1. Edit `Back/crafter/src/main/java/.../config/CorsConfig.java`
+    2. Add your frontend URL to the `allowedOrigins` list
+    3. Restart the backend
+  </Accordion>
+  
+  <Accordion title="Failed to fetch item data">
+    If the backend can't fetch Data Dragon data:
+    
+    - Check your internet connection
+    - Verify the Data Dragon API is accessible: https://ddragon.leagueoflegends.com/
+    - Try updating the `ddragon.version` in `application.properties` to a recent patch
+  </Accordion>
+  
+  <Accordion title="Frontend not connecting to backend">
+    If the frontend can't reach the backend:
+    
+    1. Verify the backend is running: `curl http://localhost:8080/api/game/question`
+    2. Check the frontend console for CORS or network errors
+    3. Ensure the `VITE_API_URL` in your `.env` matches the backend URL
+    4. Restart the frontend dev server after changing `.env` files
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you have Crafter LoL running, explore these guides to learn more:
+
+<CardGroup cols={2}>
+  <Card title="How to Play" icon="gamepad" href="/game-guide/how-to-play">
+    Learn the gameplay mechanics and controls
+  </Card>
+  <Card title="Difficulty Levels" icon="signal" href="/game-guide/difficulty-levels">
+    Understand the different challenge modes
+  </Card>
+  <Card title="Development Setup" icon="wrench" href="/development/setup">
+    Set up a full development environment
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/game/get-question">
+    Explore the backend API endpoints
+  </Card>
+</CardGroup>
+
+<Tip>
+  Join the community on GitHub to report issues, suggest features, or contribute to the project!
+</Tip>

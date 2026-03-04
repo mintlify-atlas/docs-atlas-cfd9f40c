@@ -1,0 +1,449 @@
+---
+title: 'Docker Deployment'
+description: 'Containerize and deploy Crafter LoL with Docker'
+---
+
+## Overview
+
+Crafter LoL uses **multi-stage Docker builds** for efficient containerization of both backend and frontend.
+
+<Info>
+  Multi-stage builds reduce final image size by separating build dependencies from runtime dependencies.
+</Info>
+
+## Backend Dockerfile
+
+Located at `source/Back/crafter/Dockerfile`:
+
+```dockerfile
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn package -DskipTests -B
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+```
+
+### Stage 1: Build
+
+```dockerfile
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn package -DskipTests -B
+```
+
+<AccordionGroup>
+  <Accordion title="Base Image: maven:3.9.6-eclipse-temurin-17">
+    - **Maven 3.9.6**: Build tool
+    - **Eclipse Temurin 17**: OpenJDK distribution
+    - **Size**: ~700MB (discarded after build)
+  </Accordion>
+
+  <Accordion title="Dependency Caching Strategy">
+    ```dockerfile
+    COPY pom.xml .
+    RUN mvn dependency:go-offline -B
+    ```
+    
+    **Why?** Docker caches layers. By copying `pom.xml` first and downloading dependencies before copying source code, dependencies are only re-downloaded when `pom.xml` changes.
+    
+    **Benefits:**
+    - Faster builds (deps cached)
+    - Reduced bandwidth usage
+  </Accordion>
+
+  <Accordion title="Skip Tests in Build">
+    ```dockerfile
+    RUN mvn package -DskipTests -B
+    ```
+    
+    **Flags:**
+    - `-DskipTests`: Skip test execution (compile but don't run)
+    - `-B`: Batch mode (non-interactive, no download progress)
+    
+    **Note:** Run tests in CI/CD pipeline before building image.
+  </Accordion>
+</AccordionGroup>
+
+### Stage 2: Runtime
+
+```dockerfile
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+```
+
+<AccordionGroup>
+  <Accordion title="Base Image: eclipse-temurin:17-jre-alpine">
+    - **JRE only** (no JDK/Maven): Smaller image
+    - **Alpine Linux**: Minimal Linux distribution (~5MB)
+    - **Final image size**: ~200MB (vs 700MB with full JDK)
+  </Accordion>
+
+  <Accordion title="JVM Flags Explained">
+    ```dockerfile
+    -XX:+UseContainerSupport
+    ```
+    Enables JVM container awareness. Without this, JVM may allocate memory based on host machine, not container limits.
+    
+    ```dockerfile
+    -XX:MaxRAMPercentage=75.0
+    ```
+    Limits JVM heap to 75% of container memory. Leaves 25% for:
+    - JVM metaspace
+    - Native memory
+    - OS overhead
+    
+    **Example:** 512MB container → 384MB heap, 128MB other
+  </Accordion>
+
+  <Accordion title="Why ENTRYPOINT over CMD?">
+    **ENTRYPOINT** makes the container behave like an executable:
+    ```bash
+    docker run my-app --spring.profiles.active=prod
+    ```
+    
+    Arguments are appended to ENTRYPOINT. With CMD, arguments would replace the entire command.
+  </Accordion>
+</AccordionGroup>
+
+## Building Backend Image
+
+<Steps>
+  <Step title="Navigate to Backend Directory">
+    ```bash
+    cd source/Back/crafter
+    ```
+  </Step>
+
+  <Step title="Build Docker Image">
+    ```bash
+    docker build -t crafter-lol-backend:latest .
+    ```
+    
+    <Note>
+      First build takes 2-3 minutes. Subsequent builds with cached dependencies: ~30 seconds.
+    </Note>
+  </Step>
+
+  <Step title="Verify Image">
+    ```bash
+    docker images | grep crafter-lol-backend
+    ```
+    
+    Expected output:
+    ```
+    crafter-lol-backend   latest   abc123def456   2 minutes ago   200MB
+    ```
+  </Step>
+</Steps>
+
+## Running Backend Container
+
+### Basic Run
+
+```bash
+docker run -p 5000:8080 crafter-lol-backend:latest
+```
+
+<ParamField path="-p 5000:8080" type="string">
+  Port mapping: `host:container`
+  - Host port 5000 maps to container port 8080
+  - Access at `http://localhost:5000`
+</ParamField>
+
+### With Environment Variables
+
+```bash
+docker run -p 5000:8080 \
+  -e PORT=8080 \
+  -e CORS_ORIGINS=http://localhost:5173 \
+  -e ddragon.version=16.3.1 \
+  crafter-lol-backend:latest
+```
+
+### Production Run with Resource Limits
+
+```bash
+docker run -d \
+  --name crafter-backend \
+  -p 8080:8080 \
+  --memory="512m" \
+  --cpus="1.0" \
+  --restart unless-stopped \
+  -e PORT=8080 \
+  -e CORS_ORIGINS=https://yourdomain.com \
+  crafter-lol-backend:latest
+```
+
+<AccordionGroup>
+  <Accordion title="-d (Detached Mode)">
+    Runs container in background. View logs with:
+    ```bash
+    docker logs -f crafter-backend
+    ```
+  </Accordion>
+
+  <Accordion title="--memory and --cpus">
+    Resource limits prevent container from consuming all host resources:
+    - `--memory="512m"`: Maximum 512MB RAM
+    - `--cpus="1.0"`: Maximum 1 CPU core
+    
+    With `MaxRAMPercentage=75.0`, JVM heap will be ~384MB.
+  </Accordion>
+
+  <Accordion title="--restart unless-stopped">
+    Restart policy:
+    - Container restarts on failure
+    - Does NOT restart if manually stopped
+    - Survives host reboots
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Dockerfile
+
+Create `source/Front/Crafter_League_of_Legends/Dockerfile`:
+
+```dockerfile
+# Stage 1: Build
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production=false
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Nginx Configuration
+
+Create `source/Front/Crafter_League_of_Legends/nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1000;
+
+    # SPA routing: serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+## Building Frontend Image
+
+<Steps>
+  <Step title="Navigate to Frontend Directory">
+    ```bash
+    cd source/Front/Crafter_League_of_Legends
+    ```
+  </Step>
+
+  <Step title="Build with Environment Variables">
+    ```bash
+    docker build \
+      --build-arg VITE_API_URL=http://localhost:5000/api \
+      -t crafter-lol-frontend:latest .
+    ```
+    
+    <Warning>
+      Vite environment variables must be provided at **build time**, not runtime.
+    </Warning>
+  </Step>
+
+  <Step title="Run Frontend Container">
+    ```bash
+    docker run -p 80:80 crafter-lol-frontend:latest
+    ```
+    
+    Access at `http://localhost`
+  </Step>
+</Steps>
+
+## Docker Compose
+
+Create `docker-compose.yml` in project root:
+
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./source/Back/crafter
+      dockerfile: Dockerfile
+    container_name: crafter-backend
+    ports:
+      - "5000:8080"
+    environment:
+      - PORT=8080
+      - CORS_ORIGINS=http://localhost:5173
+      - ddragon.version=16.3.1
+      - ddragon.language=es_MX
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/game/question"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./source/Front/Crafter_League_of_Legends
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:5000/api
+    container_name: crafter-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+```
+
+### Usage
+
+<CodeGroup>
+```bash Start Services
+docker-compose up -d
+```
+
+```bash View Logs
+docker-compose logs -f
+```
+
+```bash Stop Services
+docker-compose down
+```
+
+```bash Rebuild Images
+docker-compose up -d --build
+```
+</CodeGroup>
+
+## Health Checks
+
+Health check configuration ensures container is actually serving traffic:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/api/game/question"]
+  interval: 30s      # Check every 30 seconds
+  timeout: 10s       # Max 10 seconds per check
+  retries: 3         # 3 failures = unhealthy
+  start_period: 40s  # Grace period on startup
+```
+
+Check health status:
+```bash
+docker ps
+```
+
+Look for `(healthy)` in the STATUS column.
+
+## Production Considerations
+
+<AccordionGroup>
+  <Accordion title="Use Specific Version Tags">
+    **Bad:**
+    ```dockerfile
+    FROM eclipse-temurin:17-jre-alpine
+    ```
+    
+    **Good:**
+    ```dockerfile
+    FROM eclipse-temurin:17.0.10_7-jre-alpine
+    ```
+    
+    Ensures reproducible builds.
+  </Accordion>
+
+  <Accordion title="Non-Root User">
+    Add security by running as non-root:
+    ```dockerfile
+    FROM eclipse-temurin:17-jre-alpine
+    RUN addgroup -S spring && adduser -S spring -G spring
+    USER spring:spring
+    COPY --from=build /app/target/*.jar app.jar
+    ENTRYPOINT ["java", ...]
+    ```
+  </Accordion>
+
+  <Accordion title="Multi-Architecture Builds">
+    Build for ARM and x86:
+    ```bash
+    docker buildx build --platform linux/amd64,linux/arm64 \
+      -t crafter-lol-backend:latest .
+    ```
+  </Accordion>
+
+  <Accordion title="Secret Management">
+    Never hardcode secrets in Dockerfile. Use:
+    - Environment variables
+    - Docker secrets
+    - External secret management (Vault, AWS Secrets Manager)
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Containers
+
+<CodeGroup>
+```bash View Logs
+docker logs -f crafter-backend
+```
+
+```bash Execute Shell
+docker exec -it crafter-backend sh
+```
+
+```bash Inspect Container
+docker inspect crafter-backend
+```
+
+```bash Check Resource Usage
+docker stats crafter-backend
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Production Deployment" icon="rocket" href="/development/production-deployment">
+    Deploy to cloud platforms
+  </Card>
+  <Card title="Environment Configuration" icon="gear" href="/development/environment-configuration">
+    Configure for different environments
+  </Card>
+</CardGroup>

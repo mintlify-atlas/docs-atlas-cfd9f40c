@@ -1,0 +1,405 @@
+---
+title: 'Frontend Architecture'
+description: 'React and Vite frontend architecture overview'
+---
+
+## Tech Stack
+
+The frontend is built with modern web technologies:
+
+<CardGroup cols={2}>
+  <Card title="React 19.2.0" icon="react">
+    Latest React with concurrent features and improved hooks
+  </Card>
+  <Card title="Vite 7.3.1" icon="bolt">
+    Ultra-fast build tool with HMR (Hot Module Replacement)
+  </Card>
+  <Card title="Axios 1.13.5" icon="globe">
+    HTTP client for API communication
+  </Card>
+  <Card title="Framer Motion 12.34.3" icon="wand-magic-sparkles">
+    Animation library for smooth UI transitions
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+```
+source/Front/Crafter_League_of_Legends/
+├── src/
+│   ├── App.jsx                 # Main application component
+│   ├── main.jsx               # Application entry point
+│   ├── components/            # Reusable UI components
+│   ├── services/              # API and business logic
+│   ├── hooks/                 # Custom React hooks
+│   └── constants/             # Configuration and theme
+├── package.json               # Dependencies and scripts
+├── vite.config.js            # Vite configuration
+└── index.html                # HTML entry point
+```
+
+## Core Components
+
+### App.jsx - Main Application
+
+The root component orchestrates game state and logic:
+
+```jsx App.jsx
+import { useCallback, useEffect, useState, useMemo } from 'react'
+import { storageService } from '../services/storageService';
+import { GAME_CONFIG } from '../constants/theme';
+import { gameService } from '../services/gameService';
+
+function App() {
+  // Core game state
+  const [gameData, setGameData] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [score, setScore] = useState(storageService.getScore());
+  const [timeLeft, setTimeLeft] = useState(GAME_CONFIG.timePerQuestion);
+  const [feedback, setFeedback] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Dynamic slot calculation based on item components
+  const requiredSlots = useMemo(() => {
+    return gameData?.correctComponents?.length || 2;
+  }, [gameData?.correctComponents?.length]);
+
+  // Load new question from API
+  const loadNewQuestion = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await gameService.getRandomItem();
+      setGameData(data);
+    } catch (err) {
+      console.error('Error loading question:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // ... game logic
+}
+```
+
+<Info>
+  The component uses React hooks extensively for state management and side effects.
+</Info>
+
+### Key Features
+
+<AccordionGroup>
+  <Accordion title="State Management">
+    Uses React's built-in `useState` and `useCallback` hooks:
+    
+    - **gameData**: Current question and options from backend
+    - **selectedItems**: Items chosen by player
+    - **score**: Current score (persisted to localStorage)
+    - **timeLeft**: Countdown timer
+    - **feedback**: Answer validation result
+  </Accordion>
+
+  <Accordion title="Timer Logic">
+    Automatic timer pause when slots are full:
+    
+    ```jsx
+    useEffect(() => {
+      if (!gameData || feedback || timeLeft <= 0) return;
+      if (selectedItems.length >= requiredSlots) return; // PAUSE
+
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => prev > 0 ? prev - 1 : 0);
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }, [gameData, feedback, timeLeft, selectedItems.length, requiredSlots]);
+    ```
+  </Accordion>
+
+  <Accordion title="Item Selection">
+    Allows duplicates and manages slot capacity:
+    
+    ```jsx
+    const handleItemClick = useCallback((item) => {
+      if (feedback) return;
+
+      setSelectedItems((prev) => {
+        const isInSlots = prev.some((s) => s.id === item.id);
+
+        if (prev.length < requiredSlots) {
+          // Add item if slots available
+          return [...prev, item];
+        } else if (isInSlots) {
+          // Remove last occurrence if slots full
+          const lastIdx = prev.map((s) => s.id).lastIndexOf(item.id);
+          return prev.filter((_, i) => i !== lastIdx);
+        }
+        return prev;
+      });
+    }, [feedback, requiredSlots]);
+    ```
+  </Accordion>
+
+  <Accordion title="Answer Validation">
+    Submits answer and handles scoring:
+    
+    ```jsx
+    const handleSubmit = useCallback(async () => {
+      if (selectedItems.length !== requiredSlots) return;
+
+      const selectedIds = selectedItems.map((item) => item.id);
+      const result = await gameService.validateAnswer(
+        gameData.targetItem.id, 
+        selectedIds
+      );
+
+      if (result.isCorrect) {
+        const newScore = score + GAME_CONFIG.pointsPerCorrect;
+        setScore(newScore);
+        storageService.setScore(newScore);
+      } else {
+        const newScore = Math.max(0, score - GAME_CONFIG.pointsPerIncorrect);
+        setScore(newScore);
+      }
+    }, [selectedItems, gameData, score]);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Services Layer
+
+### Game Service
+
+Handles all game-related API calls using Axios:
+
+```javascript
+import axios from 'axios';
+import { API_CONFIG } from '../constants/theme';
+
+class GameService {
+  constructor() {
+    this.api = axios.create({
+      baseURL: API_CONFIG.baseURL,
+      timeout: 10000,
+    });
+  }
+
+  async getRandomItem() {
+    const response = await this.api.get(API_CONFIG.endpoints.question);
+    return response.data;
+  }
+
+  async validateAnswer(targetId, selectedIds) {
+    const response = await this.api.post(API_CONFIG.endpoints.validate, {
+      targetItemId: targetId,
+      selectedComponentIds: selectedIds,
+    });
+    return response.data;
+  }
+}
+
+export const gameService = new GameService();
+```
+
+### Storage Service
+
+Manages localStorage for persistent data:
+
+```javascript
+class StorageService {
+  getScore() {
+    return parseInt(localStorage.getItem('score') || '0', 10);
+  }
+
+  setScore(score) {
+    localStorage.setItem('score', score.toString());
+  }
+
+  getBestScore() {
+    return parseInt(localStorage.getItem('bestScore') || '0', 10);
+  }
+
+  setBestScore(score) {
+    localStorage.setItem('bestScore', score.toString());
+  }
+
+  incrementStreak() {
+    const streak = this.getStreak() + 1;
+    localStorage.setItem('streak', streak.toString());
+  }
+
+  resetStreak() {
+    localStorage.setItem('streak', '0');
+  }
+}
+
+export const storageService = new StorageService();
+```
+
+## Configuration System
+
+### Theme Constants
+
+Located at `constants/theme.js`:
+
+```javascript
+// Color palette
+export const COLORS = {
+  background: '#0A1428',
+  accentGold: '#C89B3C',
+  magicBlue: '#0BC6E3',
+  progressGreen: '#00BFA5',
+  panelDark: '#1A2332',
+  textMain: '#F0E6D2',
+  itemBorder: '#463714',
+  successGreen: '#00FF88',
+  errorRed: '#FF4444',
+};
+
+// Game mechanics
+export const GAME_CONFIG = {
+  timePerQuestion: 15,       // seconds
+  pointsPerCorrect: 100,
+  pointsPerIncorrect: 50,
+  itemsInCircle: 14,
+  circleRadius: 270,
+  centralItemSize: 120,
+  peripheralItemSize: 64,
+  maxSlots: 2,
+};
+
+// API endpoints
+export const API_CONFIG = {
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  endpoints: {
+    question: '/game/question',
+    validate: '/game/validate',
+  },
+};
+```
+
+## Vite Configuration
+
+Minimal configuration in `vite.config.js`:
+
+```javascript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: 'dist',
+  }
+})
+```
+
+<Note>
+  **react-swc** plugin provides faster builds using SWC (Speedy Web Compiler) instead of Babel.
+</Note>
+
+## Build Scripts
+
+Defined in `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "vite",              // Start dev server
+    "build": "vite build",       // Production build
+    "lint": "eslint .",          // Lint code
+    "preview": "vite preview"    // Preview production build
+  }
+}
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Starts Vite dev server with:
+- Hot Module Replacement (HMR)
+- Fast refresh for React components
+- Runs on `http://localhost:5173`
+
+### Production Build
+
+```bash
+npm run build
+```
+
+Creates optimized production bundle:
+- Minified JavaScript and CSS
+- Code splitting
+- Tree shaking
+- Output to `dist/` directory
+
+## Styling Approach
+
+<Info>
+  The application uses **inline styles** with JavaScript objects for simplicity and co-location.
+</Info>
+
+Example styling pattern:
+
+```jsx
+const styles = {
+  app: {
+    height: '100vh',
+    width: '100vw',
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'linear-gradient(135deg, #0A1428 0%, #1A2332 100%)',
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    background: COLORS.background,
+  },
+};
+
+return <div style={styles.app}>...</div>;
+```
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="React.memo and useCallback">
+    Memoization prevents unnecessary re-renders:
+    ```jsx
+    const handleItemClick = useCallback((item) => {
+      // Logic here
+    }, [feedback, requiredSlots]);
+    ```
+  </Accordion>
+
+  <Accordion title="useMemo for Computed Values">
+    Avoid recalculating on every render:
+    ```jsx
+    const requiredSlots = useMemo(() => {
+      return gameData?.correctComponents?.length || 2;
+    }, [gameData?.correctComponents?.length]);
+    ```
+  </Accordion>
+
+  <Accordion title="Code Splitting">
+    Vite automatically splits code by route/component for optimal loading.
+  </Accordion>
+
+  <Accordion title="Asset Optimization">
+    Images from Data Dragon CDN are cached by the browser and backend.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Architecture" icon="server" href="/development/backend-architecture">
+    Understand how the Spring Boot backend works
+  </Card>
+  <Card title="Data Dragon Integration" icon="dragon" href="/development/data-dragon-integration">
+    Learn about API integration and caching
+  </Card>
+</CardGroup>

@@ -1,0 +1,445 @@
+---
+title: Scoring System
+description: Master the scoring mechanics to maximize your points in Crafter LoL
+---
+
+# Scoring System
+
+Understand how points are calculated, tracked, and persisted in Crafter LoL to maximize your score and compete for the highest records.
+
+## Point Values
+
+Crafter LoL uses a simple but effective scoring system:
+
+<CardGroup cols={2}>
+  <Card title="Correct Answer" icon="check">
+    **+100 Points**
+    
+    Earned for each correct component selection
+  </Card>
+  <Card title="Incorrect Answer" icon="xmark">
+    **-50 Points**
+    
+    Deducted for wrong selections (never goes below 0)
+  </Card>
+</CardGroup>
+
+### Configuration
+
+Point values are configured in the frontend:
+
+```javascript
+// From theme.js:15-18
+export const GAME_CONFIG = {
+  timePerQuestion: 15,
+  pointsPerCorrect: 100,
+  pointsPerIncorrect: 50,
+  // ...
+};
+```
+
+<Info>
+  The backend also calculates dynamic scores based on recipe complexity (GameService.java:259-271), but the frontend currently uses fixed values.
+</Info>
+
+## Score Updates
+
+Scores are updated immediately after answer validation:
+
+### Correct Answer Flow
+
+```jsx
+// From App.jsx:104-112
+if (result.isCorrect) {
+  const newScore = score + GAME_CONFIG.pointsPerCorrect;
+  setScore(newScore);
+  storageService.setScore(newScore);
+  storageService.incrementStreak();
+
+  if (newScore > bestScore) setBestScore(newScore);
+
+  setFeedback({ isCorrect: true, points: GAME_CONFIG.pointsPerCorrect });
+}
+```
+
+**What Happens**:
+1. Add 100 points to current score
+2. Save new score to localStorage
+3. Increment streak counter
+4. Check if new best score (auto-update if yes)
+5. Show success feedback
+6. Auto-load next question after 2 seconds
+
+### Incorrect Answer Flow
+
+```jsx
+// From App.jsx:114-123
+else {
+  const newScore = Math.max(0, score - GAME_CONFIG.pointsPerIncorrect);
+  setScore(newScore);
+  storageService.setScore(newScore);
+  storageService.resetStreak();
+  setFeedback({
+    isCorrect: false,
+    points: GAME_CONFIG.pointsPerIncorrect,
+    correctItems: result.correctComponents || gameData.correctComponents,
+  });
+}
+```
+
+**What Happens**:
+1. Deduct 50 points (but never go below 0)
+2. Save new score to localStorage
+3. Reset streak counter to 0
+4. Show error feedback with correct answer
+5. Wait for player to click to continue
+
+<Warning>
+  Your score can never be negative. `Math.max(0, score - 50)` ensures the minimum score is always 0.
+</Warning>
+
+## Timeout Penalty
+
+Running out of time is treated as an incorrect answer:
+
+```jsx
+// From App.jsx:68-75
+const handleTimeout = useCallback(() => {
+  setFeedback({
+    isCorrect: false,
+    message: 'Tiempo Agotado',
+    correctItems: gameData?.correctComponents || [],
+  });
+  storageService.resetStreak();
+}, [gameData]);
+```
+
+<Info>
+  Timeouts don't deduct points directly, but they reset your streak and show you the correct answer as a learning opportunity.
+</Info>
+
+## Score Persistence
+
+Scores are persisted using browser localStorage:
+
+### Initialization
+
+```jsx
+// From App.jsx:17-18
+const [score, setScore] = useState(storageService.getScore());
+const [bestScore, setBestScore] = useState(storageService.getBestScore());
+```
+
+When the game loads:
+1. Current score is retrieved from localStorage
+2. Best score is retrieved from localStorage
+3. If no saved scores exist, both default to 0
+
+### Storage Service
+
+The `storageService` handles all localStorage operations:
+
+```javascript
+// Typical storage service implementation
+const storageService = {
+  getScore() {
+    return parseInt(localStorage.getItem('currentScore') || '0');
+  },
+  setScore(score) {
+    localStorage.setItem('currentScore', score.toString());
+  },
+  getBestScore() {
+    return parseInt(localStorage.getItem('bestScore') || '0');
+  },
+  incrementStreak() {
+    const streak = this.getStreak() + 1;
+    localStorage.setItem('streak', streak.toString());
+  },
+  resetStreak() {
+    localStorage.setItem('streak', '0');
+  },
+  getStreak() {
+    return parseInt(localStorage.getItem('streak') || '0');
+  }
+};
+```
+
+<Tabs>
+  <Tab title="Current Score">
+    **localStorage key**: `currentScore`
+    
+    - Updated after every question
+    - Persists across browser sessions
+    - Can be manually reset by clearing localStorage
+    
+    ```javascript
+    // Reset current score
+    localStorage.removeItem('currentScore');
+    ```
+  </Tab>
+  <Tab title="Best Score">
+    **localStorage key**: `bestScore`
+    
+    - Only updates when current score exceeds it
+    - Represents your all-time high
+    - Survives game restarts
+    
+    ```javascript
+    // From App.jsx:110
+    if (newScore > bestScore) setBestScore(newScore);
+    ```
+  </Tab>
+  <Tab title="Streak">
+    **localStorage key**: `streak`
+    
+    - Counts consecutive correct answers
+    - Resets on any incorrect answer or timeout
+    - Currently tracked but not displayed
+    
+    ```javascript
+    // Increment on success
+    storageService.incrementStreak();
+    
+    // Reset on failure
+    storageService.resetStreak();
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Scores are stored per browser. Using a different browser or incognito mode will start fresh.
+</Note>
+
+## Score Display
+
+Scores are displayed in the game header:
+
+```jsx
+// From App.jsx:156
+<GameHeader timeLeft={timeLeft} score={score} bestScore={bestScore} />
+```
+
+The header typically shows:
+- **Current Score**: Your score in the current session
+- **Best Score**: Your all-time highest score
+- **Timer**: Countdown for current question
+
+<Tip>
+  Watching your best score provides motivation to keep improving and try different strategies!
+</Tip>
+
+## Backend Score Calculation
+
+While the frontend uses fixed values, the backend implements a more sophisticated scoring system:
+
+```java
+// From GameService.java:259-271
+private int calculateScore(int componentCount) {
+    // Base points per component
+    int baseScore = componentCount * 50;
+
+    // Bonus for complexity
+    if (componentCount >= 3) {
+        baseScore += 100;  // Complex recipe bonus
+    } else if (componentCount == 2) {
+        baseScore += 50;   // Standard recipe bonus
+    }
+
+    return baseScore;
+}
+```
+
+**Backend Scoring Logic**:
+- **2 components**: (2 × 50) + 50 = **150 points**
+- **3 components**: (3 × 50) + 100 = **250 points**
+- **4 components**: (4 × 50) + 100 = **300 points**
+
+<Info>
+  This backend calculation is not currently used by the frontend, but could be integrated to reward more complex recipes with higher scores.
+</Info>
+
+## Score Optimization Strategies
+
+### Maximize Points
+
+<Accordion title="Accuracy Over Speed">
+  **Strategy**: Take your time to ensure correct answers
+  
+  - +100 for correct is worth more than rushing
+  - Remember: timer pauses when slots are filled
+  - Use the pause to review your selections
+  - -50 penalty hurts more than you think
+  
+  **Math**:
+  - 3 correct answers = +300 points
+  - 2 correct + 1 wrong = +200 - 50 = +150 points
+  - That's a 150 point difference!
+</Accordion>
+
+<Accordion title="Build Streaks">
+  **Strategy**: Consecutive correct answers build streaks
+  
+  While streaks don't currently affect points, maintaining streaks:
+  - Builds confidence and momentum
+  - Helps you maintain focus
+  - May be used for achievements in future versions
+  
+  ```javascript
+  // Streak tracking
+  storageService.incrementStreak();  // On success
+  storageService.resetStreak();      // On failure
+  ```
+</Accordion>
+
+<Accordion title="Avoid Timeouts">
+  **Strategy**: Always submit an answer before time runs out
+  
+  - Timeout = 0 points + streak reset
+  - Wrong answer = -50 points + streak reset
+  - At least with a guess, you have a chance to be right!
+  
+  <Tip>
+    If you're unsure with 5 seconds left, make your best guess and submit!
+  </Tip>
+</Accordion>
+
+<Accordion title="Learn Common Recipes">
+  **Strategy**: Focus on memorizing frequently used components
+  
+  Common components appear in many recipes:
+  - B.F. Sword (many AD items)
+  - Needlessly Large Rod (many AP items)
+  - Chain Vest (many armor items)
+  - Cloth Armor (basic armor component)
+  - Long Sword (basic AD component)
+  
+  Knowing these will improve your accuracy significantly.
+</Accordion>
+
+### Score Milestones
+
+<Steps>
+  <Step title="Beginner: 500 Points">
+    **5 correct answers** (with no mistakes)
+    
+    At this level, you're learning the game mechanics and starting to recognize common items.
+  </Step>
+  <Step title="Intermediate: 1,500 Points">
+    **15 correct answers** (with minimal mistakes)
+    
+    You're familiar with most common recipes and can maintain good accuracy.
+  </Step>
+  <Step title="Advanced: 5,000 Points">
+    **50+ correct answers** (with high accuracy)
+    
+    You know the item system well and rarely make mistakes.
+  </Step>
+  <Step title="Expert: 10,000+ Points">
+    **100+ correct answers** (with excellent accuracy)
+    
+    You're a true LoL item expert and can handle Hard difficulty consistently.
+  </Step>
+</Steps>
+
+## Score Reset
+
+If you want to start fresh:
+
+<CodeGroup>
+```javascript Browser Console
+// Reset current score only
+localStorage.removeItem('currentScore');
+
+// Reset best score only
+localStorage.removeItem('bestScore');
+
+// Reset everything (including streak)
+localStorage.clear();
+
+// Then refresh the page
+window.location.reload();
+```
+
+```bash Clear Browser Data
+// In Chrome/Edge/Brave:
+// 1. Press F12 to open DevTools
+// 2. Go to Application tab
+// 3. Click "Local Storage" → your domain
+// 4. Right-click → Clear
+// 5. Refresh page
+```
+</CodeGroup>
+
+<Warning>
+  Clearing localStorage will also reset any other data stored by the application. Make sure you want to lose all progress!
+</Warning>
+
+## Future Enhancements
+
+Potential scoring system improvements:
+
+<CardGroup cols={2}>
+  <Card title="Dynamic Backend Scores" icon="calculator">
+    Use the backend's complexity-based scoring:
+    - More points for items with more components
+    - Bonus points for rare/difficult recipes
+    - Difficulty multipliers
+  </Card>
+  <Card title="Time Bonuses" icon="stopwatch">
+    Reward fast answers:
+    - +10 points per second remaining
+    - Speed bonuses for streaks
+    - Time attack mode
+  </Card>
+  <Card title="Combo System" icon="fire">
+    Reward consecutive correct answers:
+    - 2x multiplier at 5 streak
+    - 3x multiplier at 10 streak
+    - 5x multiplier at 20 streak
+  </Card>
+  <Card title="Leaderboards" icon="ranking-star">
+    Compete with others:
+    - Global high scores
+    - Daily/weekly challenges
+    - Achievement system
+  </Card>
+</CardGroup>
+
+## Summary
+
+<Tabs>
+  <Tab title="Quick Reference">
+    | Event | Points | Effect |
+    |-------|--------|--------|
+    | Correct answer | +100 | Streak +1 |
+    | Wrong answer | -50 | Streak reset |
+    | Timeout | 0 | Streak reset |
+    | New best score | 0 | Update best score |
+    | Minimum score | 0 | Never negative |
+  </Tab>
+  <Tab title="Storage">
+    | Key | Purpose | Updates |
+    |-----|---------|----------|
+    | `currentScore` | Active session score | Every question |
+    | `bestScore` | All-time high | When exceeded |
+    | `streak` | Consecutive correct | Every question |
+  </Tab>
+  <Tab title="Pro Tips">
+    1. **Accuracy > Speed**: +100 beats rushing
+    2. **Use timer pause**: Review before submitting
+    3. **Learn patterns**: Common components repeat
+    4. **Guess smartly**: Better than timeout
+    5. **Track best score**: Compete with yourself
+  </Tab>
+</Tabs>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Game Mechanics" icon="gears" href="/game-guide/game-mechanics">
+    Understand how the game validates answers
+  </Card>
+  <Card title="How to Play" icon="gamepad" href="/game-guide/how-to-play">
+    Learn the basic gameplay and controls
+  </Card>
+</CardGroup>

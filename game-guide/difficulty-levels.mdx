@@ -1,0 +1,386 @@
+---
+title: Difficulty Levels
+description: Understand the three difficulty modes and their unique challenges
+---
+
+# Difficulty Levels
+
+Crafter LoL offers three difficulty levels that dramatically change the challenge by adjusting the number of options, time limits, and distractor quality.
+
+## Overview
+
+<CardGroup cols={3}>
+  <Card title="Easy" icon="baby">
+    **6 Options** | **50 Seconds**
+    
+    Perfect for learning item recipes with fewer distractors and generous time.
+  </Card>
+  <Card title="Medium" icon="graduation-cap">
+    **10 Options** | **40 Seconds**
+    
+    Balanced challenge with moderate options and reasonable time pressure.
+  </Card>
+  <Card title="Hard" icon="fire">
+    **14 Options** | **30 Seconds**
+    
+    Maximum challenge with smart distractors designed to confuse you!
+  </Card>
+</CardGroup>
+
+## Difficulty Configuration
+
+Difficulty is configured on both frontend and backend:
+
+```javascript
+// Frontend sends difficulty parameter - gameService.js:59-61
+const response = await api.get(API_CONFIG.endpoints.question, {
+    params: { difficulty: 'HARD' }
+});
+```
+
+```java
+// Backend constants - GameService.java:24-30
+private static final int EASY_OPTIONS = 6;
+private static final int MEDIUM_OPTIONS = 10;
+private static final int HARD_OPTIONS = 14;
+
+private static final int EASY_TIME = 50;
+private static final int MEDIUM_TIME = 40;
+private static final int HARD_TIME = 30;
+```
+
+<Note>
+  Currently, the frontend is hardcoded to request HARD difficulty. You can change this in `gameService.js:60` to test other difficulties.
+</Note>
+
+## Easy Mode
+
+### Characteristics
+
+- **Total Options**: 6 items to choose from
+- **Time Limit**: 50 seconds per question
+- **Distractor Strategy**: Random selection
+
+### Who Should Play Easy?
+
+<Accordion title="New to League of Legends">
+  If you're not familiar with LoL items, Easy mode gives you:
+  - More time to read item names
+  - Fewer options to overwhelm you
+  - Better odds of guessing correctly
+  - Opportunity to learn common recipes
+</Accordion>
+
+<Accordion title="Learning the Game">
+  Easy mode is perfect for understanding Crafter LoL mechanics:
+  - Get comfortable with the interface
+  - Learn how selection and submission works
+  - Understand the timer behavior
+  - Practice before moving to harder difficulties
+</Accordion>
+
+### Option Generation
+
+```java
+// From GameService.java:243-248
+private int getTotalOptions(String difficulty) {
+    return switch (difficulty) {
+        case "EASY" -> EASY_OPTIONS;    // Returns 6
+        case "HARD" -> HARD_OPTIONS;
+        default -> MEDIUM_OPTIONS;
+    };
+}
+```
+
+With only 6 options, distractors are randomly selected:
+
+```java
+// Random distractor selection - GameService.java:217-227
+List<Item> fallback = allItems.values().stream()
+    .filter(item -> !addedIds.contains(item.getId()))
+    .filter(item -> item.getTotalCost() > 0)
+    .collect(Collectors.toList());
+Collections.shuffle(fallback);
+```
+
+<Info>
+  On Easy mode, you have **~33-50% chance** of guessing correctly if you don't know the answer (depending on whether 2 or 3 components are needed).
+</Info>
+
+## Medium Mode
+
+### Characteristics
+
+- **Total Options**: 10 items to choose from
+- **Time Limit**: 40 seconds per question
+- **Distractor Strategy**: Random selection with more options
+
+### Who Should Play Medium?
+
+<Accordion title="Casual LoL Players">
+  Medium mode is ideal if you:
+  - Have played League of Legends but aren't an item expert
+  - Want a balanced challenge between learning and testing
+  - Enjoy having time to think without being rushed
+  - Are comfortable with the game interface
+</Accordion>
+
+<Accordion title="Improving Your Knowledge">
+  Medium strikes a balance between:
+  - **Challenge**: 10 options provide meaningful difficulty
+  - **Fairness**: 40 seconds is enough time to think strategically
+  - **Learning**: More distractors help you learn what's NOT correct
+</Accordion>
+
+### Time Pressure
+
+```java
+// Time limits by difficulty - GameService.java:251-256
+private int getTimeLimit(String difficulty) {
+    return switch (difficulty) {
+        case "EASY" -> EASY_TIME;      // 50 seconds
+        case "HARD" -> HARD_TIME;      // 30 seconds
+        default -> MEDIUM_TIME;         // 40 seconds
+    };
+}
+```
+
+40 seconds provides:
+- Time to read all 10 item names
+- Opportunity to use elimination strategies
+- Slight pressure to keep the game engaging
+- Enough buffer for careful selection
+
+<Tip>
+  On Medium, spend the first 10-15 seconds surveying all options before making selections. This helps you spot obvious distractors.
+</Tip>
+
+## Hard Mode
+
+### Characteristics
+
+- **Total Options**: 14 items to choose from (maximum circle capacity)
+- **Time Limit**: 30 seconds per question
+- **Distractor Strategy**: **Intelligent selection** based on tags and costs
+
+### Who Should Play Hard?
+
+<Accordion title="LoL Veterans">
+  Hard mode is designed for players who:
+  - Have extensive League of Legends experience
+  - Know most item recipes by heart
+  - Want a serious challenge
+  - Enjoy time pressure and strategic thinking
+</Accordion>
+
+<Accordion title="Competitive Players">
+  If you want to:
+  - Test your true knowledge against smart distractors
+  - Achieve the highest possible scores
+  - Compete for best times
+  - Push your limits under pressure
+</Accordion>
+
+### Smart Distractor Algorithm
+
+Hard mode uses a sophisticated 3-phase algorithm to generate deceptive distractors:
+
+<Steps>
+  <Step title="Phase 1: Tag Matching">
+    Select items with overlapping tags:
+
+    ```java
+    // From GameService.java:170-174
+    Set<String> correctTags = correctComponentIds.stream()
+        .map(allItems::get)
+        .filter(Objects::nonNull)
+        .flatMap(item -> item.getTags() != null ? 
+            item.getTags().stream() : Stream.empty())
+        .collect(Collectors.toSet());
+    ```
+
+    Example: If crafting an AD item, distractors will also be AD items.
+
+    ```java
+    // From GameService.java:186-193
+    List<Item> smartDistractors = allItems.values().stream()
+        .filter(item -> !addedIds.contains(item.getId()))
+        .filter(item -> item.getTotalCost() >= costMin && 
+                        item.getTotalCost() <= costMax)
+        .filter(item -> item.getTags() != null &&
+            !Collections.disjoint(item.getTags(), correctTags))
+        .collect(Collectors.toList());
+    ```
+  </Step>
+
+  <Step title="Phase 2: Cost Matching">
+    If not enough tag-based distractors, add items with similar costs:
+
+    ```java
+    // From GameService.java:176-184
+    int avgCost = (int) correctComponentIds.stream()
+        .map(allItems::get)
+        .filter(Objects::nonNull)
+        .mapToInt(Item::getTotalCost)
+        .average()
+        .orElse(1000);
+
+    int costMin = (int) (avgCost * 0.5);  // 50% of average
+    int costMax = (int) (avgCost * 2.0);  // 200% of average
+    ```
+
+    This ensures distractors look plausible based on gold cost.
+  </Step>
+
+  <Step title="Phase 3: Random Fill">
+    Only if phases 1 and 2 don't provide enough items:
+
+    ```java
+    // From GameService.java:217-228
+    if (options.size() < totalOptions) {
+        List<Item> fallback = allItems.values().stream()
+            .filter(item -> !addedIds.contains(item.getId()))
+            .filter(item -> item.getTotalCost() > 0)
+            .collect(Collectors.toList());
+        Collections.shuffle(fallback);
+    }
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Hard mode distractors are NOT random! They're specifically chosen to have similar attributes to the correct components. Visual inspection alone won't be enough - you need to actually know the recipes.
+</Warning>
+
+### Example: Hard Mode Question
+
+Let's say the target item is **Infinity Edge** (crafted from B.F. Sword + B.F. Sword + Cloak of Agility):
+
+**Correct Components**:
+- B.F. Sword (Attack Damage, 1300g)
+- Cloak of Agility (Critical Strike, 600g)
+
+**Smart Distractors Might Include**:
+- Long Sword (Attack Damage, 350g) - shares AD tag
+- Pickaxe (Attack Damage, 875g) - shares AD tag, similar cost
+- Brawler's Gloves (Critical Strike, 600g) - shares Crit tag, exact cost match!
+- Serrated Dirk (Attack Damage, 1100g) - shares AD tag, similar cost
+
+<Info>
+  Notice how all distractors have overlapping attributes! This is why Hard mode is truly challenging.
+</Info>
+
+## Comparison Table
+
+| Feature | Easy | Medium | Hard |
+|---------|------|--------|------|
+| **Total Options** | 6 | 10 | 14 |
+| **Time Limit** | 50s | 40s | 30s |
+| **Distractor Strategy** | Random | Random | Tag & Cost Matching |
+| **Recommended For** | Beginners | Casual Players | Experts |
+| **Guess Success Rate** | ~33-50% | ~20-33% | ~10-20% |
+| **Learning Value** | High | Medium | Low (needs prior knowledge) |
+| **Competitive Value** | Low | Medium | High |
+
+## Switching Difficulties
+
+To change difficulty, modify the frontend code:
+
+```javascript
+// In gameService.js:59-61
+const response = await api.get(API_CONFIG.endpoints.question, {
+    params: { difficulty: 'EASY' }  // Change to 'EASY', 'MEDIUM', or 'HARD'
+});
+```
+
+<Tip>
+  You can create a difficulty selector UI component to let players choose their preferred challenge level dynamically!
+</Tip>
+
+## Strategy by Difficulty
+
+<Tabs>
+  <Tab title="Easy Strategy">
+    **Use Your Time Wisely**
+    - Read all 6 options carefully
+    - Think about which items appear in common builds
+    - Remember that basic items (Long Sword, Cloth Armor) are often components
+    - Don't rush - you have 50 full seconds
+
+    **Learn Patterns**
+    - Note which items appear together frequently
+    - Pay attention to the correct answers when you're wrong
+    - Build your mental database of common recipes
+  </Tab>
+
+  <Tab title="Medium Strategy">
+    **Elimination Process**
+    - Quickly scan all 10 items
+    - Eliminate obviously wrong items first (different damage types, unrelated tags)
+    - Focus on remaining candidates
+    - Use the 40 seconds strategically
+
+    **Cost Analysis**
+    - Look at relative costs if you know the target item's total cost
+    - Components usually add up to less than the final item cost
+    - Very cheap items (300-400g) are basic components
+  </Tab>
+
+  <Tab title="Hard Strategy">
+    **Know Your Items**
+    - Hard mode requires actual knowledge - guessing is difficult
+    - Distractors are designed to trick you
+    - Trust your memory of recipes over visual similarities
+
+    **Fast Decision Making**
+    - You only have 30 seconds
+    - Make quick assessments
+    - Don't second-guess yourself too much
+    - Use the timer pause (when slots are full) to review before submitting
+
+    **Tag Awareness**
+    - Remember that distractors share tags with correct answers
+    - Having the right tags doesn't guarantee correctness
+    - Look for the MOST appropriate items, not just similar ones
+  </Tab>
+</Tabs>
+
+## Performance Expectations
+
+<Accordion title="Easy Mode">
+  **Expected Performance**:
+  - Beginners: 40-60% accuracy
+  - Casual players: 60-80% accuracy
+  - Experts: 90-100% accuracy
+
+  With generous time and few options, even beginners should have success.
+</Accordion>
+
+<Accordion title="Medium Mode">
+  **Expected Performance**:
+  - Beginners: 20-40% accuracy
+  - Casual players: 50-70% accuracy
+  - Experts: 80-95% accuracy
+
+  Medium provides a fair challenge for most players.
+</Accordion>
+
+<Accordion title="Hard Mode">
+  **Expected Performance**:
+  - Beginners: 10-20% accuracy (mostly guessing)
+  - Casual players: 30-50% accuracy
+  - Experts: 60-85% accuracy
+
+  Even experts will struggle with smart distractors and time pressure!
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scoring System" icon="trophy" href="/game-guide/scoring-system">
+    Learn how scores are calculated and optimized
+  </Card>
+  <Card title="Game Mechanics" icon="gears" href="/game-guide/game-mechanics">
+    Dive deep into the technical implementation
+  </Card>
+</CardGroup>

@@ -1,0 +1,132 @@
+---
+title: Introduction to Crafter LoL
+description: Welcome to Crafter LoL - Test your knowledge of League of Legends item crafting recipes
+---
+
+# Welcome to Crafter LoL
+
+Crafter LoL is an engaging quiz game that challenges your knowledge of League of Legends item crafting system. Test your skills by identifying the correct component items needed to craft powerful equipment!
+
+<Info>
+  Crafter LoL combines fast-paced gameplay with strategic thinking. You have limited time to select the right components before crafting each item.
+</Info>
+
+## What is Crafter LoL?
+
+Crafter LoL is a React-based web game that presents you with a target League of Legends item and challenges you to select its crafting components from a pool of options. The game features:
+
+<CardGroup cols={2}>
+  <Card title="Time-Based Challenges" icon="clock">
+    Race against the clock with 15 seconds per question to identify the correct components
+  </Card>
+  <Card title="Multiple Difficulty Levels" icon="gauge-high">
+    Choose from Easy, Medium, or Hard modes with varying numbers of options and time limits
+  </Card>
+  <Card title="Score Tracking" icon="trophy">
+    Earn 100 points for correct answers and track your best score across sessions
+  </Card>
+  <Card title="Dynamic Questions" icon="shuffle">
+    Each round presents a new random item with shuffled component options
+  </Card>
+</CardGroup>
+
+## How It Works
+
+The game pulls from the complete League of Legends item database to generate questions:
+
+1. **Target Item Display**: A craftable item appears in the center of your screen
+2. **Component Selection**: Multiple item options appear around the target
+3. **Crafting Process**: Select the correct components to craft the target item
+4. **Validation**: Submit your answer and receive instant feedback
+5. **Score Update**: Earn or lose points based on your accuracy
+
+<Note>
+  The game uses real League of Legends item data, including authentic crafting recipes, item images, and costs.
+</Note>
+
+## Key Features
+
+### Intelligent Difficulty Scaling
+
+The backend implements smart distractor generation based on difficulty:
+
+- **Easy Mode**: 6 total options with random component items
+- **Medium Mode**: 10 total options with moderate challenge
+- **Hard Mode**: 14 total options with similar tags and cost ranges to trick you
+
+### Real-Time Feedback
+
+Get immediate visual feedback on your selections:
+
+```jsx
+// Feedback system from App.jsx:112-124
+if (result.isCorrect) {
+  const newScore = score + GAME_CONFIG.pointsPerCorrect;
+  setScore(newScore);
+  storageService.incrementStreak();
+  setFeedback({ isCorrect: true, points: GAME_CONFIG.pointsPerCorrect });
+} else {
+  const newScore = Math.max(0, score - GAME_CONFIG.pointsPerIncorrect);
+  setScore(newScore);
+  storageService.resetStreak();
+  setFeedback({
+    isCorrect: false,
+    points: GAME_CONFIG.pointsPerIncorrect,
+    correctItems: result.correctComponents
+  });
+}
+```
+
+### Persistent Score Storage
+
+Your scores are saved locally so you can track your progress over time and compete against your personal best.
+
+## Technology Stack
+
+Crafter LoL is built with modern web technologies:
+
+<Tabs>
+  <Tab title="Frontend">
+    - **React 18** with hooks for state management
+    - **Vite** for fast development and building
+    - **Axios** for API communication
+    - **CSS-in-JS** styling with League of Legends themed colors
+  </Tab>
+  <Tab title="Backend">
+    - **Spring Boot** Java backend
+    - **REST API** for game questions and validation
+    - **Item Service** managing the LoL item database
+    - **Smart algorithm** for generating challenging questions
+  </Tab>
+</Tabs>
+
+## Design Philosophy
+
+The game features an immersive League of Legends aesthetic:
+
+```javascript
+// Color palette from theme.js:2-12
+export const COLORS = {
+  background: '#0A1428',
+  accentGold: '#C89B3C',
+  magicBlue: '#0BC6E3',
+  progressGreen: '#00BFA5',
+  panelDark: '#1A2332',
+  textMain: '#F0E6D2',
+  itemBorder: '#463714',
+  successGreen: '#00FF88',
+  errorRed: '#FF4444',
+};
+```
+
+<Tip>
+  The dark blue background (#0A1428) and golden accent (#C89B3C) are directly inspired by the League of Legends client interface.
+</Tip>
+
+## Getting Started
+
+Ready to test your League of Legends item knowledge? Head over to the [Quickstart Guide](/quickstart) to set up the game locally, or dive into the [How to Play](/game-guide/how-to-play) guide to learn the gameplay mechanics.
+
+<Card title="Next: Quickstart Guide" icon="rocket" href="/quickstart">
+  Get Crafter LoL running on your local machine in minutes
+</Card>

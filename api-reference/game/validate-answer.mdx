@@ -1,0 +1,146 @@
+---
+title: 'Validate Answer'
+api: 'POST /api/game/validate'
+description: "Validate the player's answer to a crafting question"
+---
+
+## Request Body
+
+<ParamField body="targetItemId" type="string" required>
+  The unique identifier of the target item the player is trying to craft. Cannot be null.
+</ParamField>
+
+<ParamField body="selectedComponentIds" type="List<String>" required>
+  List of item IDs that the player selected as components. Cannot be empty.
+</ParamField>
+
+## Response
+
+<ResponseField name="correct" type="boolean" required>
+  Whether the player's answer is correct or not
+</ResponseField>
+
+<ResponseField name="correctComponentIds" type="List<String>" required>
+  List of item IDs that are the correct components for crafting the target item
+</ResponseField>
+
+<ResponseField name="correctComponentNames" type="List<String>" required>
+  List of display names of the correct components
+</ResponseField>
+
+<ResponseField name="correctComponents" type="List<ItemOption>" required>
+  List of ItemOption objects with full details of the correct components
+  
+  <Expandable title="ItemOption properties">
+    <ResponseField name="itemId" type="string">
+      The unique identifier of the component item
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The display name of the component
+    </ResponseField>
+    
+    <ResponseField name="imageUrl" type="string">
+      URL to the component's image
+    </ResponseField>
+    
+    <ResponseField name="cost" type="integer">
+      The gold cost of the component
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="incorrectComponentIds" type="List<String>" required>
+  List of item IDs that the player selected incorrectly (empty if answer is correct)
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Feedback message describing the result (e.g., "Correct!", "Incorrect. Try again!")
+</ResponseField>
+
+<ResponseField name="scorePoints" type="integer" required>
+  Points awarded for this answer (typically positive if correct, 0 if incorrect)
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST "https://api.crafterlol.com/api/game/validate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetItemId": "3078",
+    "selectedComponentIds": ["3044", "3051", "3057"]
+  }'
+```
+
+## Example Response (Correct Answer)
+
+```json
+{
+  "correct": true,
+  "correctComponentIds": ["3044", "3051", "3057"],
+  "correctComponentNames": ["Phage", "Hearthbound Axe", "Sheen"],
+  "correctComponents": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    }
+  ],
+  "incorrectComponentIds": [],
+  "message": "Correct! You've successfully crafted Trinity Force.",
+  "scorePoints": 100
+}
+```
+
+## Example Response (Incorrect Answer)
+
+```json
+{
+  "correct": false,
+  "correctComponentIds": ["3044", "3051", "3057"],
+  "correctComponentNames": ["Phage", "Hearthbound Axe", "Sheen"],
+  "correctComponents": [
+    {
+      "itemId": "3044",
+      "name": "Phage",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3044.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3051",
+      "name": "Hearthbound Axe",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3051.png",
+      "cost": 1100
+    },
+    {
+      "itemId": "3057",
+      "name": "Sheen",
+      "imageUrl": "https://ddragon.leagueoflegends.com/cdn/14.1.1/img/item/3057.png",
+      "cost": 700
+    }
+  ],
+  "incorrectComponentIds": ["1001", "1036"],
+  "message": "Incorrect. The correct components are: Phage, Hearthbound Axe, Sheen.",
+  "scorePoints": 0
+}
+```
+
+## Validation Rules
+
+- The `targetItemId` field is required and cannot be null
+- The `selectedComponentIds` field is required and cannot be empty
+- The answer is considered correct only if the selected components exactly match the correct components for the target item

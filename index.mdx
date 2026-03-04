@@ -1,97 +1,183 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden py-20 bg-gradient-to-br from-[#0b152a] via-[#121f34] to-[#0a0f26]">
+  <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold dark:text-white text-gray-900 mb-6">
+          Master League of Legends Item Crafting
+        </h1>
+        <p className="text-base sm:text-lg lg:text-xl dark:text-gray-300 text-gray-600 max-w-2xl mb-8">
+          Test your knowledge of League of Legends items in this fast-paced crafting game. Match items with their correct components across three difficulty levels.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 rounded-lg text-base font-semibold transition-colors bg-[#fbc926] text-[#0a0f26] hover:bg-[#c18e3a]"
+          >
+            Get Started
+          </a>
+          <a
+            href="/game-guide/how-to-play"
+            className="inline-flex items-center px-6 py-3 rounded-lg text-base font-semibold transition-colors border border-white/30 bg-white/10 dark:text-white text-gray-900 hover:bg-white/20"
+          >
+            How to Play
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:flex items-center justify-center">
+        <div className="relative w-full h-64 flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-r from-[#fbc926] to-[#8c73fa] rounded-full blur-3xl opacity-20"></div>
+          <svg className="w-48 h-48 relative z-10" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" stroke="#fbc926" strokeWidth="4" fill="none" opacity="0.5"/>
+            <circle cx="100" cy="100" r="60" stroke="#8c73fa" strokeWidth="4" fill="none" opacity="0.7"/>
+            <circle cx="100" cy="100" r="40" fill="#fbc926" opacity="0.3"/>
+            <path d="M100 30 L115 70 L160 70 L120 100 L135 140 L100 115 L65 140 L80 100 L40 70 L85 70 Z" fill="#fbc926"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">Quick Start</h2>
+  <p className="text-base dark:text-gray-400 text-gray-600 mb-8">Get up and running with Crafter LoL in minutes</p>
+  
+  <Steps>
+    <Step title="Clone the repository">
+      Start by cloning the Crafter LoL repository to your local machine.
+      
+      ```bash
+      git clone https://github.com/Jordavid/Craffter_lol.git
+      cd Craffter_lol
+      ```
+    </Step>
+    
+    <Step title="Set up the backend">
+      Navigate to the backend directory and start the Spring Boot server.
+      
+      ```bash
+      cd Back/crafter
+      mvn spring-boot:run
+      ```
+      
+      The backend will start on `http://localhost:8080` and fetch League of Legends item data from the Data Dragon API.
+    </Step>
+    
+    <Step title="Launch the frontend">
+      In a new terminal, navigate to the frontend directory and start the React app.
+      
+      ```bash
+      cd Front/Crafter_League_of_Legends
+      npm install
+      npm run dev
+      ```
+      
+      Open your browser and navigate to the URL shown in the terminal to start playing!
+    </Step>
+  </Steps>
+</div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">Explore the Game</h2>
+  <p className="text-base dark:text-gray-400 text-gray-600 mb-8">Learn how to play and master the crafting mechanics</p>
+  
+  <CardGroup cols={2}>
     <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      title="How to Play"
+      icon="gamepad"
+      href="/game-guide/how-to-play"
+    >
+      Learn the basics of gameplay and start your crafting journey
+    </Card>
+    <Card
+      title="Game Mechanics"
+      icon="gears"
+      href="/game-guide/game-mechanics"
+    >
+      Understand the core mechanics of item selection and crafting
+    </Card>
+    <Card
+      title="Difficulty Levels"
+      icon="signal"
+      href="/game-guide/difficulty-levels"
+    >
+      Choose your challenge with easy, medium, or hard difficulty
+    </Card>
+    <Card
+      title="Scoring System"
+      icon="trophy"
+      href="/game-guide/scoring-system"
+    >
+      Discover how points are awarded and track your best score
+    </Card>
+  </CardGroup>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">For Developers</h2>
+  <p className="text-base dark:text-gray-400 text-gray-600 mb-8">Dive into the architecture and extend the game</p>
+  
+  <CardGroup cols={3}>
+    <Card
+      title="Setup Guide"
+      icon="wrench"
+      href="/development/setup"
+    >
+      Configure your development environment
+    </Card>
+    <Card
+      title="Frontend Architecture"
+      icon="react"
+      href="/development/frontend-architecture"
+    >
+      Explore the React and Vite frontend
+    </Card>
+    <Card
+      title="Backend Architecture"
+      icon="server"
+      href="/development/backend-architecture"
+    >
+      Understand the Spring Boot backend
+    </Card>
+    <Card
+      title="Data Dragon Integration"
+      icon="dragon"
+      href="/development/data-dragon-integration"
+    >
+      Learn how we integrate with Riot's API
+    </Card>
+    <Card
+      title="Docker Deployment"
+      icon="docker"
+      href="/development/docker-deployment"
+    >
+      Deploy with Docker containers
+    </Card>
+    <Card
+      title="API Reference"
+      icon="code"
+      href="/api-reference/game/get-question"
+    >
+      Explore the REST API endpoints
+    </Card>
+  </CardGroup>
+</div>
 
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-8">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">Ready to Start Playing?</h2>
+    <p className="text-base dark:text-gray-400 text-gray-600 mb-6">
+      Jump into the action and test your League of Legends item knowledge. Follow our quickstart guide to get the game running locally in minutes.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center px-6 py-3 rounded-lg text-base font-semibold transition-colors bg-[#fbc926] text-[#0a0f26] hover:bg-[#c18e3a]"
+    >
+      Start Now
+    </a>
+  </div>
+</div>
